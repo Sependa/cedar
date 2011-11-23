@@ -27,6 +27,10 @@
 		42064467139B44EC00C85605 /* CDRTeamCityReporter.h in Headers */ = {isa = PBXBuildFile; fileRef = 42064465139B44EC00C85605 /* CDRTeamCityReporter.h */; };
 		4206446A139B44F600C85605 /* CDRTeamCityReporter.m in Sources */ = {isa = PBXBuildFile; fileRef = 42064469139B44F600C85605 /* CDRTeamCityReporter.m */; };
 		4206446B139B44F600C85605 /* CDRTeamCityReporter.m in Sources */ = {isa = PBXBuildFile; fileRef = 42064469139B44F600C85605 /* CDRTeamCityReporter.m */; };
+		49F5090D141FD94200281358 /* CDRJenkinsReporter.m in Sources */ = {isa = PBXBuildFile; fileRef = 49F5090A141FD94200281358 /* CDRJenkinsReporter.m */; };
+		49F5090F141FD94200281358 /* CDRJenkinsReporter.m in Sources */ = {isa = PBXBuildFile; fileRef = 49F5090A141FD94200281358 /* CDRJenkinsReporter.m */; };
+		49F50911141FD98000281358 /* CDRJenkinsReporter.h in Headers */ = {isa = PBXBuildFile; fileRef = 49F50910141FD98000281358 /* CDRJenkinsReporter.h */; };
+		49F50912141FD98000281358 /* CDRJenkinsReporter.h in Headers */ = {isa = PBXBuildFile; fileRef = 49F50910141FD98000281358 /* CDRJenkinsReporter.h */; };
 		960118BC1434867E00825FFF /* CDROTestIPhoneRunner.m in Sources */ = {isa = PBXBuildFile; fileRef = 960118BB1434867E00825FFF /* CDROTestIPhoneRunner.m */; };
 		96158A88144A915E005895CE /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96158A87144A915E005895CE /* Cocoa.framework */; };
 		96158A92144A915E005895CE /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 96158A90144A915E005895CE /* InfoPlist.strings */; };
@@ -356,6 +360,8 @@
 /* Begin PBXFileReference section */
 		42064465139B44EC00C85605 /* CDRTeamCityReporter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CDRTeamCityReporter.h; sourceTree = "<group>"; };
 		42064469139B44F600C85605 /* CDRTeamCityReporter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CDRTeamCityReporter.m; sourceTree = "<group>"; };
+		49F5090A141FD94200281358 /* CDRJenkinsReporter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CDRJenkinsReporter.m; sourceTree = "<group>"; };
+		49F50910141FD98000281358 /* CDRJenkinsReporter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CDRJenkinsReporter.h; sourceTree = "<group>"; };
 		960118BB1434867E00825FFF /* CDROTestIPhoneRunner.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CDROTestIPhoneRunner.m; sourceTree = "<group>"; };
 		96158A86144A915E005895CE /* OCUnitAppLogicTests.octest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OCUnitAppLogicTests.octest; sourceTree = BUILT_PRODUCTS_DIR; };
 		96158A87144A915E005895CE /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
@@ -765,6 +771,7 @@
 				AEEE1FC411DC27B800029872 /* CDRDefaultReporter.m */,
 				AEC9DEEB12C2CC7E0039512D /* CDRColorizedReporter.m */,
 				42064469139B44F600C85605 /* CDRTeamCityReporter.m */,
+				49F5090A141FD94200281358 /* CDRJenkinsReporter.m */,
 				96EA1CA6142C6425001A78E0 /* CDROTestReporter.m */,
 				96EA1CA7142C6425001A78E0 /* CDROTestRunner.m */,
 			);
@@ -790,6 +797,7 @@
 				AEEE1FCB11DC27B800029872 /* CDRDefaultReporter.h */,
 				AEC9DEEA12C2CC7E0039512D /* CDRColorizedReporter.h */,
 				42064465139B44EC00C85605 /* CDRTeamCityReporter.h */,
+				49F50910141FD98000281358 /* CDRJenkinsReporter.h */,
 				96EA1CAC142C6449001A78E0 /* CDROTestReporter.h */,
 				96EA1CAD142C6449001A78E0 /* CDROTestRunner.h */,
 			);
@@ -977,6 +985,7 @@
 				AE18A7D313F45BE500C8872C /* ComparatorsBase.h in Headers */,
 				AE18A7D613F45BFC00C8872C /* ComparatorsContainer.h in Headers */,
 				AE18A7FB13F4601400C8872C /* Contain.h in Headers */,
+				49F50911141FD98000281358 /* CDRJenkinsReporter.h in Headers */,
 				AEF32FF2145A2D79002F93BB /* BeGreaterThan.h in Headers */,
 				AEF32FF4145A2E91002F93BB /* CompareEqual.h in Headers */,
 				AEF32FF8145A2EDF002F93BB /* CompareGreaterThan.h in Headers */,
@@ -993,6 +1002,7 @@
 			files = (
 				AEC9DEEF12C2CC7E0039512D /* CDRColorizedReporter.h in Headers */,
 				42064467139B44EC00C85605 /* CDRTeamCityReporter.h in Headers */,
+				49F50912141FD98000281358 /* CDRJenkinsReporter.h in Headers */,
 				96EA1CAF142C6449001A78E0 /* CDROTestReporter.h in Headers */,
 				968BA92F143485F800EA40B3 /* CDROTestIPhoneRunner.h in Headers */,
 			);
@@ -1369,6 +1379,7 @@
 				AE8C881413626FE7006C9305 /* CDRSpecFailure.m in Sources */,
 				4206446A139B44F600C85605 /* CDRTeamCityReporter.m in Sources */,
 				AE0AF57D13E9C5B200029396 /* BeInstanceOf.mm in Sources */,
+				49F5090D141FD94200281358 /* CDRJenkinsReporter.m in Sources */,
 				96EA1CA8142C6425001A78E0 /* CDROTestReporter.m in Sources */,
 				96EA1CAA142C6425001A78E0 /* CDROTestRunner.m in Sources */,
 			);
@@ -1426,6 +1437,7 @@
 				AE8C881513626FE7006C9305 /* CDRSpecFailure.m in Sources */,
 				4206446B139B44F600C85605 /* CDRTeamCityReporter.m in Sources */,
 				AE0AF57E13E9C5B200029396 /* BeInstanceOf.mm in Sources */,
+				49F5090F141FD94200281358 /* CDRJenkinsReporter.m in Sources */,
 				96EA1CA9142C6425001A78E0 /* CDROTestReporter.m in Sources */,
 				960118BC1434867E00825FFF /* CDROTestIPhoneRunner.m in Sources */,
 			);
