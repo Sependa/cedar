@@ -5,7 +5,6 @@
 @interface CDRDefaultReporter : NSObject <CDRExampleReporter> {
     NSArray *rootGroups_;
 
-    NSMutableArray *successMessages_;
     NSMutableArray *pendingMessages_;
     NSMutableArray *skippedMessages_;
     NSMutableArray *failureMessages_;
@@ -18,7 +17,6 @@
 
 @interface CDRDefaultReporter (Protected)
 - (NSString *)successToken;
-- (NSString *)successMessageForExample:(CDRExample *)example;
 - (NSString *)pendingToken;
 - (NSString *)pendingMessageForExample:(CDRExample *)example;
 - (NSString *)skippedToken;
