@@ -34,13 +34,8 @@ void fail(NSString *);
 #import "ActualValue.h"
 #import "ShouldSyntax.h"
 #import "CedarComparators.h"
-#ifdef CEDAR_CUSTOM_COMPARATORS
-#import CEDAR_CUSTOM_COMPARATORS
-#endif
 #import "CedarMatchers.h"
-#ifdef CEDAR_CUSTOM_MATCHERS
-#import CEDAR_CUSTOM_MATCHERS
-#endif
+#import "CedarDoubles.h"
 
 #endif // __cplusplus
 

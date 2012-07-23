@@ -1,8 +1,12 @@
+#import <Foundation/Foundation.h>
+#include <sstream>
+
 namespace Cedar { namespace Matchers { namespace Stringifiers {
     template<typename U>
     NSString * string_for(const U & value) {
-        if (strcmp(@encode(U), "@") == 0) {
-            return [reinterpret_cast<const id &>(value) description];
+        if (0 == strncmp(@encode(U), "@", 1)) {
+            NSValue *valueId = [NSValue value:&value withObjCType:@encode(id)];
+            return [[valueId nonretainedObjectValue] description];
         } else {
             std::stringstream temp;
             temp << value;

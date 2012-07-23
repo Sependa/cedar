@@ -3,24 +3,27 @@
 #import "CDRFunctions.h"
 #import <objc/runtime.h>
 
-void runSpecsWithinUIApplication() {
+int runSpecsWithinUIApplication() {
     int exitStatus;
 
     char *defaultReporterClassName = objc_getClass("SenTestProbe") ? "CDROTestReporter" : "CDRDefaultReporter";
-    Class reporterClass = CDRReporterClassFromEnv(defaultReporterClassName);
+    NSArray *reporters = CDRReportersFromEnv(defaultReporterClassName);
 
-    if (!reporterClass) {
+    if (![reporters count]) {
         exitStatus = -999;
     } else {
-        id<CDRExampleReporter> reporter = [[[reporterClass alloc] init] autorelease];
-        exitStatus = runSpecsWithCustomExampleReporter(reporter);
+        exitStatus = runSpecsWithCustomExampleReporters(reporters);
     }
 
+    return exitStatus;
+}
+
+void exitWithStatusFromUIApplication(int status) {
     UIApplication *application = [UIApplication sharedApplication];
     if ([application respondsToSelector:@selector(_terminateWithStatus:)]) {
-        [application performSelector:@selector(_terminateWithStatus:) withObject:(id)exitStatus];
+        [application performSelector:@selector(_terminateWithStatus:) withObject:(id)status];
     } else {
-        exit(exitStatus);
+        exit(status);
     }
 }
 

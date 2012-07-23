@@ -8,9 +8,10 @@
 #import "CDRFunctions.h"
 
 BOOL CDRClassIsOfType(Class class, const char * const className) {
+    Protocol * protocol = NSProtocolFromString([NSString stringWithCString:className encoding:NSUTF8StringEncoding]);
     if (strcmp(className, class_getName(class))) {
         while (class) {
-            if (class_conformsToProtocol(class, NSProtocolFromString([NSString stringWithCString:className encoding:NSUTF8StringEncoding]))) {
+            if (class_conformsToProtocol(class, protocol)) {
                 return YES;
             }
             class = class_getSuperclass(class);
@@ -68,19 +69,37 @@ void CDRDefineGlobalBeforeAndAfterEachBlocks() {
     [SpecHelper specHelper].globalAfterEachClasses = CDRSelectClasses(^BOOL(Class class) { return CDRClassHasClassMethod(class, @selector(afterEach)); });
 }
 
-Class CDRReporterClassFromEnv(const char *defaultReporterClassName) {
-    const char *reporterClassName = getenv("CEDAR_REPORTER_CLASS");
-    if (!reporterClassName) {
-        reporterClassName = defaultReporterClassName;
+NSArray *CDRReporterClassesFromEnv(const char *defaultReporterClassName) {
+    const char *reporterClassNamesCsv = getenv("CEDAR_REPORTER_CLASS");
+    if (!reporterClassNamesCsv) {
+        reporterClassNamesCsv = defaultReporterClassName;
     }
 
-    Class reporterClass = NSClassFromString([NSString stringWithCString:reporterClassName encoding:NSUTF8StringEncoding]);
-    if (!reporterClass) {
-        printf("***** The specified reporter class \"%s\" does not exist. *****\n", reporterClassName);
-        return nil;
+    NSString *objCClassNames = [NSString stringWithUTF8String:reporterClassNamesCsv];
+    NSArray *reporterClassNames = [objCClassNames componentsSeparatedByString:@","];
+
+    NSMutableArray *reporterClasses = [NSMutableArray arrayWithCapacity:[reporterClassNames count]];
+    for (NSString *reporterClassName in reporterClassNames) {
+        Class reporterClass = NSClassFromString(reporterClassName);
+        if (!reporterClass) {
+            printf("***** The specified reporter class \"%s\" does not exist. *****\n", [reporterClassName cStringUsingEncoding:NSUTF8StringEncoding]);
+            return nil;
+        }
+        [reporterClasses addObject:reporterClass];
     }
 
-    return reporterClass;
+    return reporterClasses;
+}
+
+NSArray *CDRReportersFromEnv(const char *defaultReporterClassName) {
+    NSArray *reporterClasses = CDRReporterClassesFromEnv(defaultReporterClassName);
+
+    NSMutableArray *reporters = [NSMutableArray arrayWithCapacity:[reporterClasses count]];
+    for (Class reporterClass in reporterClasses) {
+        [reporters addObject:[[[reporterClass alloc] init] autorelease]];
+    }
+
+    return reporters;
 }
 
 NSArray *CDRSpecClassesToRun() {
@@ -99,46 +118,47 @@ NSArray *CDRSpecClassesToRun() {
     return nil;
 }
 
-int runSpecsWithCustomExampleReporter(id<CDRExampleReporter> reporter) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+int runSpecsWithCustomExampleReporters(NSArray *reporters) {
+    @autoreleasepool {
+        NSArray *specClasses = CDRSpecClassesToRun();
+        if (!specClasses) {
+            specClasses = CDRSelectClasses(^(Class class) { return CDRClassIsOfType(class, "CDRSpec"); });
+        }
 
-    NSArray *specClasses = CDRSpecClassesToRun();
-    if (!specClasses) {
-        specClasses = CDRSelectClasses(^(Class class) { return CDRClassIsOfType(class, "CDRSpec"); });
+        CDRDefineSharedExampleGroups();
+        CDRDefineGlobalBeforeAndAfterEachBlocks();
+        NSArray *groups = CDRCreateRootGroupsFromSpecClasses(specClasses);
+
+        for (CDRExampleGroup *group in groups) {
+            [SpecHelper specHelper].shouldOnlyRunFocused |= [group hasFocusedExamples];
+        }
+
+        for (id<CDRExampleReporter> reporter in reporters) {
+            [reporter runWillStartWithGroups:groups];
+        }
+
+        [groups makeObjectsPerformSelector:@selector(run)];
+
+        int result = 0;
+        for (id<CDRExampleReporter> reporter in reporters) {
+            [reporter runDidComplete];
+            result |= [reporter result];
+        }
+
+        [groups release];
+        return result;
     }
-
-    CDRDefineSharedExampleGroups();
-    CDRDefineGlobalBeforeAndAfterEachBlocks();
-    NSArray *groups = CDRCreateRootGroupsFromSpecClasses(specClasses);
-
-    for (CDRExampleGroup *group in groups) {
-        [SpecHelper specHelper].shouldOnlyRunFocused |= [group hasFocusedExamples];
-    }
-
-    [reporter runWillStartWithGroups:groups];
-    [groups makeObjectsPerformSelector:@selector(run)];
-    [reporter runDidComplete];
-
-    int result = [reporter result];
-
-    [groups release];
-    [pool drain];
-    return result;
 }
 
 int runSpecs() {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    @autoreleasepool {
+        NSArray *reporters = CDRReportersFromEnv("CDRDefaultReporter");
+        if (![reporters count]) {
+            @throw @"No reporters?  WTF?";
+        }
 
-    Class reporterClass = CDRReporterClassFromEnv("CDRDefaultReporter");
-    if (!reporterClass) {
-        return -999;
+        return runSpecsWithCustomExampleReporters(reporters);
     }
-
-    id<CDRExampleReporter> reporter = [[[reporterClass alloc] init] autorelease];
-    int result = runSpecsWithCustomExampleReporter(reporter);
-
-    [pool drain];
-    return result;
 }
 
 int runAllSpecs() {
