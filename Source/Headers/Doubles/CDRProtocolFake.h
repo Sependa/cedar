@@ -37,5 +37,10 @@ inline id CDR_fake_for(Protocol *protocol, bool require_explicit_stubs = true) {
     }
     objc_registerClassPair(klass);
 
-    return [[[CDRProtocolFake alloc] initWithClass:klass forProtocol:protocol requireExplicitStubs:require_explicit_stubs] autorelease];
+    CDRProtocolFake *fake = [[CDRProtocolFake alloc] initWithClass:klass forProtocol:protocol requireExplicitStubs:require_explicit_stubs];
+#if __has_feature(objc_arc)
+    return fake;
+#else
+    return [fake autorelease];
+#endif
 }
