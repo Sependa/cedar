@@ -1,8 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <tr1/memory>
 #import <vector>
-#import "Argument.h"
 #import "InvocationMatcher.h"
+#import "Argument.h"
+#import "ReturnValue.h"
 
 namespace Cedar { namespace Doubles {
 
@@ -99,8 +100,9 @@ namespace Cedar { namespace Doubles {
         if (has_return_value()) {
             const char * const methodReturnType = [[instance methodSignatureForSelector:selector()] methodReturnType];
             if (!return_value().matches_encoding(methodReturnType)) {
+                NSString * selectorString = NSStringFromSelector(selector());
                 [[NSException exceptionWithName:NSInternalInconsistencyException
-                                         reason:[NSString stringWithFormat:@"Invalid return value type (%s) for %s", return_value().value_encoding(), selector()]
+                                         reason:[NSString stringWithFormat:@"Invalid return value type (%s) for %@", return_value().value_encoding(), selectorString]
                                        userInfo:nil] raise];
 
             }
