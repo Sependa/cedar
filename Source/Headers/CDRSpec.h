@@ -13,6 +13,7 @@ extern const CDRSpecBlock PENDING;
 extern "C" {
 #endif
 void beforeEach(CDRSpecBlock);
+void action(CDRSpecBlock block);
 void afterEach(CDRSpecBlock);
 
 CDRExampleGroup * describe(NSString *, CDRSpecBlock);

@@ -10,6 +10,10 @@ void beforeEach(CDRSpecBlock block) {
     [currentSpec.currentGroup addBefore:block];
 }
 
+void action(CDRSpecBlock block) {
+    [currentSpec.currentGroup setAction:block];
+}
+
 void afterEach(CDRSpecBlock block) {
     [currentSpec.currentGroup addAfter:block];
 }

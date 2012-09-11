@@ -57,6 +57,7 @@ const CDRSpecBlock PENDING = nil;
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         @try {
             [parent_ setUp];
+            [parent_ runAction];
             block_();
             self.state = CDRExampleStatePassed;
         } @catch (CDRSpecFailure *x) {

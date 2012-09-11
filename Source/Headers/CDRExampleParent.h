@@ -5,6 +5,7 @@
 - (BOOL)shouldRun;
 
 - (void)setUp;
+- (void)runAction;
 - (void)tearDown;
 
 @optional

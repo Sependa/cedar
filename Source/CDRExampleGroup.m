@@ -8,6 +8,8 @@
 @implementation CDRExampleGroup
 
 @synthesize examples = examples_;
+@synthesize action = action_;
+
 
 + (id)groupWithText:(NSString *)text {
     return [[[[self class] alloc] initWithText: text] autorelease];
@@ -29,6 +31,7 @@
 
 - (void)dealloc {
     [afterBlocks_ release];
+    [action_ release];
     [examples_ release];
     [beforeBlocks_ release];
     [super dealloc];
@@ -108,6 +111,14 @@
     [parent_ setUp];
     for (CDRSpecBlock beforeBlock in beforeBlocks_) {
         beforeBlock();
+    }
+}
+
+- (void)runAction
+{
+    [parent_ runAction];
+    if (self.action) {
+        self.action();
     }
 }
 

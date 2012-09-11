@@ -45,6 +45,9 @@ static SpecHelper *specHelper__;
     return NO;
 }
 
+- (void)runAction
+{}
+
 - (void)setUp {
     if ([self respondsToSelector:@selector(beforeEach)]) {
         NSLog(@"********************************************************************************");
