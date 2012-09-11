@@ -65,9 +65,10 @@ const CDRSpecBlock PENDING = nil;
         } @catch (NSObject *x) {
             self.failure = [CDRSpecFailure specFailureWithRaisedObject:x];
             self.state = CDRExampleStateError;
+        } @finally{
+            [parent_ tearDown];
+            [pool drain];
         }
-        [parent_ tearDown];
-        [pool drain];
     } else {
         self.state = CDRExampleStatePending;
     }
