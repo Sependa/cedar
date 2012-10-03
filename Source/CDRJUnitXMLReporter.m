@@ -57,7 +57,7 @@
             break;
         case CDRExampleStateSkipped:
             if (self.skippedAsFailed) {
-                [failureMessages_ addObject:[NSString stringWithFormat:@"%@\n%@\n",[example fullText], @"Skipped"]];
+                [failureMessages_ addObject:[NSString stringWithFormat:@"%@\n%@\n",[example fullText], @"Test skipped and we hate it. Fail!"]];
             } else {
                 [skippedMessages_ addObject:example.fullText];
             }
@@ -74,19 +74,22 @@
 - (void)appendXMLForTestcaseWithName:(NSString *)name body:(NSString *)body toString:(NSMutableString *)xml {
     NSUInteger firstWordEndIndex = [name rangeOfCharacterFromSet:[NSCharacterSet whitespaceCharacterSet]].location;
     if (firstWordEndIndex != NSNotFound) {
-        [xml appendFormat:@"\t<testcase classname=\"%@\" name=\"%@\">\n", [name substringToIndex:firstWordEndIndex], [self escape:name]];
+        [xml appendFormat:@"\t<testcase classname=\"%@\" name=\"%@\"", [name substringToIndex:firstWordEndIndex], [self escape:name]];
     } else {
-        [xml appendFormat:@"\t<testcase name=\"%@\">\n", [self escape:name]];
+        [xml appendFormat:@"\t<testcase name=\"%@\"", [self escape:name]];
     }
     
     if (body) {
+        [xml appendString:@">\n"];
         [xml appendFormat:@"\t\t%@\n", body];
+        [xml appendString:@"\t</testcase>\n"];
+    } else {
+        [xml appendString:@"/>\n"];
     }
-    [xml appendString:@"\t</testcase>\n"];
 }
 
 - (void)runDidComplete {
-    NSTimeInterval time = [startTime_ timeIntervalSinceNow] * (-1);
+    NSTimeInterval time = fabs([startTime_ timeIntervalSinceNow]);
     
     NSMutableString *xml = [NSMutableString string];
     [xml appendString:@"<?xml version=\"1.0\"?>\n"];
