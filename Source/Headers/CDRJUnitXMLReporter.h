@@ -5,4 +5,6 @@
     NSMutableArray *successMessages_;
 }
 
+@property (nonatomic) BOOL skippedAsFailed;
+
 @end

@@ -7,6 +7,10 @@
 - (id)init {
     if (self = [super init]) {
         successMessages_ = [[NSMutableArray alloc] init];
+        
+        if (getenv("CEDAR_JUNIT_XML_SKIPPED_AS_FAILED")) {
+            self.skippedAsFailed = YES;
+        }
     }
     return self;
 }
@@ -52,7 +56,11 @@
             [successMessages_ addObject:example.fullText];
             break;
         case CDRExampleStateSkipped:
-            [skippedMessages_ addObject:example.fullText];
+            if (self.skippedAsFailed) {
+                [failureMessages_ addObject:[NSString stringWithFormat:@"%@\n%@\n",[example fullText], @"Skipped"]];
+            } else {
+                [skippedMessages_ addObject:example.fullText];
+            }
             break;
         case CDRExampleStateFailed:
         case CDRExampleStateError:
