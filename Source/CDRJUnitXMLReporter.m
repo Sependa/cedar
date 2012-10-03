@@ -20,7 +20,7 @@
 
 - (NSString *)escape:(NSString *)s {
     NSMutableString *escaped = [NSMutableString stringWithString:s];
-
+    
     [escaped setString:[escaped stringByReplacingOccurrencesOfString:@"&" withString:@"&amp;"]];
     [escaped setString:[escaped stringByReplacingOccurrencesOfString:@">" withString:@"&gt;"]];
     [escaped setString:[escaped stringByReplacingOccurrencesOfString:@"<" withString:@"&lt;"]];
@@ -35,7 +35,7 @@
     if (!xmlFile) {
         xmlFile = "build/TEST-Cedar.xml";
     }
-
+    
     NSError *error;
     [xml writeToFile:[NSString stringWithUTF8String:xmlFile] atomically:YES encoding:NSUTF8StringEncoding error:&error];
 }
@@ -47,10 +47,12 @@
 }
 
 - (void)reportOnExample:(CDRExample *)example {
-    NSMutableArray *messages = nil;
     switch (example.state) {
         case CDRExampleStatePassed:
-            [successMessages_ addObject:[example fullText]];
+            [successMessages_ addObject:example.fullText];
+            break;
+        case CDRExampleStateSkipped:
+            [skippedMessages_ addObject:example.fullText];
             break;
         case CDRExampleStateFailed:
         case CDRExampleStateError:
@@ -61,27 +63,48 @@
     }
 }
 
+- (void)appendXMLForTestcaseWithName:(NSString *)name body:(NSString *)body toString:(NSMutableString *)xml {
+    NSUInteger firstWordEndIndex = [name rangeOfCharacterFromSet:[NSCharacterSet whitespaceCharacterSet]].location;
+    if (firstWordEndIndex != NSNotFound) {
+        [xml appendFormat:@"\t<testcase classname=\"%@\" name=\"%@\">\n", [name substringToIndex:firstWordEndIndex], [self escape:name]];
+    } else {
+        [xml appendFormat:@"\t<testcase name=\"%@\">\n", [self escape:name]];
+    }
+    
+    if (body) {
+        [xml appendFormat:@"\t\t%@\n", body];
+    }
+    [xml appendString:@"\t</testcase>\n"];
+}
+
 - (void)runDidComplete {
+    NSTimeInterval time = [startTime_ timeIntervalSinceNow] * (-1);
+    
     NSMutableString *xml = [NSMutableString string];
     [xml appendString:@"<?xml version=\"1.0\"?>\n"];
-    [xml appendString:@"<testsuite>\n"];
-
+    [xml appendFormat:@"<testsuite time=\"%.4f\">\n", time];
+    
     for (NSString *spec in successMessages_) {
-        [xml appendFormat:@"\t<testcase classname=\"Cedar\" name=\"%@\" />\n", [self escape:spec]];
+        [self appendXMLForTestcaseWithName:spec body:nil toString:xml];
     }
-
+    
     for (NSString *spec in failureMessages_) {
         NSArray *parts = [spec componentsSeparatedByString:@"\n"];
+        
         NSString *name = [parts objectAtIndex:0];
         NSString *message = [parts objectAtIndex:1];
-
-        [xml appendFormat:@"\t<testcase classname=\"Cedar\" name=\"%@\">\n", [self escape:name]];
-        [xml appendFormat:@"\t\t<failure type=\"Failure\">%@</failure>\n", [self escape:message]];
-        [xml appendString:@"\t</testcase>\n"];
+        
+        NSString *body = [NSString stringWithFormat:@"<failure>%@</failure>", [self escape:message]];
+        
+        [self appendXMLForTestcaseWithName:name body:body toString:xml];
     }
-
+    
+    for (NSString *spec in skippedMessages_) {
+        [self appendXMLForTestcaseWithName:spec body:@"<skipped/>" toString:xml];
+    }
+    
     [xml appendString:@"</testsuite>\n"];
-
+    
     [self writeXmlToFile:xml];
 }
 
