@@ -6,11 +6,4 @@
 
 @end
 
-inline id CDR_fake_for(Class klass, bool require_explicit_stubs = true) {
-    CDRClassFake *fake = [[CDRClassFake alloc] initWithClass:klass requireExplicitStubs:require_explicit_stubs];
-#if __has_feature(objc_arc)
-    return fake;
-#else
-    return [fake autorelease];
-#endif
-}
+id CDR_fake_for(Class klass, bool require_explicit_stubs = true);

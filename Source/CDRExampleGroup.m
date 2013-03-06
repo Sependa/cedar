@@ -7,8 +7,7 @@
 
 @implementation CDRExampleGroup
 
-@synthesize examples = examples_;
-@synthesize action = action_;
+@synthesize examples = examples_, subjectActionBlock = subjectActionBlock_;
 
 
 + (id)groupWithText:(NSString *)text {
@@ -34,12 +33,28 @@
     [action_ release];
     [examples_ release];
     [beforeBlocks_ release];
+    self.subjectActionBlock = nil;
     [super dealloc];
 }
 
 #pragma mark Public interface
 - (NSString *)description {
-    return [NSString stringWithFormat:@"Example Group: %@", self.text];
+    return [NSString stringWithFormat:@"Example Group: \"%@\"", self.fullText];
+}
+
+- (CDRSpecBlock)subjectActionBlock {
+    CDRSpecBlock parentsubjectActionBlock = self.parent.subjectActionBlock;
+    if (subjectActionBlock_) {
+        if (parentsubjectActionBlock) {
+            @throw([NSException exceptionWithName:NSInternalInconsistencyException
+                                           reason:[NSString stringWithFormat:@"%@ has more than one subject action block", self]
+                                         userInfo:nil]);
+        } else {
+            return subjectActionBlock_;
+        }
+    } else {
+        return parentsubjectActionBlock;
+    }
 }
 
 - (void)add:(CDRExampleBase *)example {
@@ -85,9 +100,12 @@
 }
 
 - (void)run {
+    NSDate *startDate = [[NSDate alloc] init];
     [self startObservingExamples];
     [examples_ makeObjectsPerformSelector:@selector(run)];
     [self stopObservingExamples];
+    runTime_ = -[startDate timeIntervalSinceNow];
+    [startDate release];
 }
 
 - (BOOL)hasFocusedExamples {

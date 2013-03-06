@@ -61,6 +61,10 @@ static SpecHelper *specHelper__;
     [self.globalBeforeEachClasses makeObjectsPerformSelector:@selector(beforeEach)];
 }
 
+- (CDRSpecBlock)subjectActionBlock {
+    return nil;
+}
+
 - (void)tearDown {
     if ([self respondsToSelector:@selector(afterEach)]) {
         NSLog(@"********************************************************************************");

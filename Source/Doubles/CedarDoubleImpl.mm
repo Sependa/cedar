@@ -16,6 +16,7 @@
 
 - (id)init {
     [super doesNotRecognizeSelector:_cmd];
+    return nil;
 }
 
 - (id)initWithDouble:(NSObject<CedarDouble> *)parent_double {
@@ -30,6 +31,10 @@
     self.parent_double = nil;
     self.sent_messages = nil;
     [super dealloc];
+}
+
+- (void)reset_sent_messages {
+    [self.sent_messages removeAllObjects];
 }
 
 - (Cedar::Doubles::StubbedMethod::selector_map_t &)stubbed_methods {
@@ -68,7 +73,6 @@
 
     Cedar::Doubles::StubbedMethod::shared_ptr_t stubbed_method_ptr = it->second;
     if (stubbed_method_ptr->matches(invocation)) {
-        [self record_method_invocation:invocation];
         stubbed_method_ptr->invoke(invocation);
         return true;
     } else {
@@ -81,6 +85,7 @@
 }
 
 - (void)record_method_invocation:(NSInvocation *)invocation {
+    [invocation retainArguments];
     [self.sent_messages addObject:invocation];
 }
 

@@ -2,9 +2,12 @@
 
 @interface CDRExampleGroup : CDRExampleBase <CDRExampleParent> {
     NSMutableArray *beforeBlocks_, *examples_, *afterBlocks_;
+    NSUInteger stackAddress_;
     BOOL isRoot_;
 }
 @property(nonatomic, copy) CDRSpecBlock action;
+
+@property (nonatomic, copy) CDRSpecBlock subjectActionBlock;
 @property (nonatomic, readonly) NSArray *examples;
 
 + (id)groupWithText:(NSString *)text;

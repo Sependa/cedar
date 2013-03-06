@@ -51,12 +51,14 @@ const CDRSpecBlock PENDING = nil;
 }
 
 - (void)run {
+    NSDate *startDate = [[NSDate alloc] init];
     if (!self.shouldRun) {
         self.state = CDRExampleStateSkipped;
     } else if (block_) {
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         @try {
             [parent_ setUp];
+            if (parent_.subjectActionBlock) { parent_.subjectActionBlock(); }
             [parent_ runAction];
             block_();
             self.state = CDRExampleStatePassed;
@@ -73,6 +75,8 @@ const CDRSpecBlock PENDING = nil;
     } else {
         self.state = CDRExampleStatePending;
     }
+    runTime_ = -[startDate timeIntervalSinceNow];
+    [startDate release];
 }
 
 #pragma mark Private interface

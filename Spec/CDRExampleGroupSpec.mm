@@ -11,6 +11,7 @@
 #import "CDRExampleGroup.h"
 #import "CDRExample.h"
 #import "NoOpKeyValueObserver.h"
+#import "FibonacciCalculator.h"
 
 using namespace Cedar::Matchers;
 using namespace Cedar::Doubles;
@@ -25,23 +26,13 @@ describe(@"CDRExampleGroup", ^{
     NSString *groupText = @"Group!";
 
     beforeEach(^{
-        group = [[CDRExampleGroup alloc] initWithText:groupText];
-        incompleteExample = [[CDRExample alloc] initWithText:@"incomplete" andBlock:^{}];
-        passingExample = [[CDRExample alloc] initWithText:@"I should pass" andBlock:^{}];
-        failingExample = [[CDRExample alloc] initWithText:@"I should fail" andBlock:^{fail(@"I have failed.");}];
-        pendingExample = [[CDRExample alloc] initWithText:@"I should pend" andBlock:nil];
-        errorExample = [[CDRExample alloc] initWithText:@"I should raise an error" andBlock:^{ @throw @"wibble"; }];
-        nonFocusedExample = [[CDRExample alloc] initWithText:@"I should not be focused" andBlock:^{}];
-    });
-
-    afterEach(^{
-        [errorExample release];
-        [pendingExample release];
-        [failingExample release];
-        [passingExample release];
-        [incompleteExample release];
-        [nonFocusedExample release];
-        [group release];
+        group = [[[CDRExampleGroup alloc] initWithText:groupText] autorelease];
+        incompleteExample = [[[CDRExample alloc] initWithText:@"incomplete" andBlock:^{}] autorelease];
+        passingExample = [[[CDRExample alloc] initWithText:@"I should pass" andBlock:^{}] autorelease];
+        failingExample = [[[CDRExample alloc] initWithText:@"I should fail" andBlock:^{fail(@"I have failed.");}] autorelease];
+        pendingExample = [[[CDRExample alloc] initWithText:@"I should pend" andBlock:nil] autorelease];
+        errorExample = [[[CDRExample alloc] initWithText:@"I should raise an error" andBlock:^{ @throw @"wibble"; }] autorelease];
+        nonFocusedExample = [[[CDRExample alloc] initWithText:@"I should not be focused" andBlock:^{}] autorelease];
     });
 
     describe(@"hasChildren", ^{
@@ -600,6 +591,130 @@ describe(@"CDRExampleGroup", ^{
                 NSArray *fullTextPieces = group.fullTextInPieces;
                 NSString *text = group.text;
                 expect([fullTextPieces isEqual:[NSArray arrayWithObject:text]]).to(be_truthy());
+            });
+        });
+    });
+
+    describe(@"runTime", ^{
+        __block CDRExample *firstExample;
+        __block CDRExample *secondExample;
+        __block CDRExampleGroup *exampleGroup;
+        __block BOOL test;
+
+        beforeEach(^{
+            test = NO;
+            FibonacciCalculator *calculator = [[[FibonacciCalculator alloc] init] autorelease];
+            firstExample = [[CDRExample alloc] initWithText:@"I'm Slow!" andBlock:^{
+                [calculator computeFibonnaciNumberVeryVerySlowly:4];
+            }];
+            secondExample = [[CDRExample alloc] initWithText:@"I'm Slower!" andBlock:^{
+                [calculator computeFibonnaciNumberVeryVerySlowly:5];
+            }];
+
+            exampleGroup = [[[CDRExampleGroup alloc] initWithText:@"I have slow examples"] autorelease];
+            [exampleGroup add:firstExample];
+            [exampleGroup add:secondExample];
+        });
+
+        it(@"should return the running time of the test", ^{
+            exampleGroup.runTime should equal(0);
+            [exampleGroup run];
+            exampleGroup.runTime should be_greater_than(0);
+            exampleGroup.runTime should be_greater_than_or_equal_to(firstExample.runTime + secondExample.runTime);
+        });
+    });
+
+    describe(@"subjectActionBlock", ^{
+        context(@"with a subject action block set", ^{
+            CDRSpecBlock subjectActionBlock = ^{};
+
+            beforeEach(^{
+                group.subjectActionBlock = subjectActionBlock;
+            });
+
+            context(@"and with a parent", ^{
+                __block CDRExampleGroup *parent;
+
+                beforeEach(^{
+                    parent = [[[CDRExampleGroup alloc] initWithText:@"Parent"] autorelease];
+                    group.parent = parent;
+                });
+
+                context(@"which has a subject action block", ^{
+                    CDRSpecBlock parentsubjectActionBlock = ^{};
+
+                    beforeEach(^{
+                        parent.subjectActionBlock = parentsubjectActionBlock;
+                    });
+
+                    it(@"should raise a duplicate subject action block exception", ^{
+                        __block id dummy;
+                        ^{ dummy = group.subjectActionBlock; } should raise_exception;
+                    });
+                });
+
+                context(@"which does not have a subject action block", ^{
+                    beforeEach(^{
+                        parent.subjectActionBlock should_not be_truthy;
+                    });
+
+                    it(@"should return its subject action block", ^{
+                        group.subjectActionBlock should equal(subjectActionBlock);
+                    });
+                });
+            });
+
+            context(@"and with no parent", ^{
+                beforeEach(^{
+                    group.parent should be_nil;
+                });
+
+                it(@"should return its subject action block", ^{
+                    group.subjectActionBlock should equal(subjectActionBlock);
+                });
+            });
+        });
+
+        context(@"with no subject action block set", ^{
+            context(@"and with a parent", ^{
+                __block CDRExampleGroup *parent;
+
+                beforeEach(^{
+                    parent = [[[CDRExampleGroup alloc] initWithText:@"Parent"] autorelease];
+                    group.parent = parent;
+                });
+
+                context(@"which has a subject action block", ^{
+                    CDRSpecBlock parentsubjectActionBlock = ^{};
+
+                    beforeEach(^{
+                        parent.subjectActionBlock = parentsubjectActionBlock;
+                    });
+
+                    it(@"should return its parent's subject action block", ^{
+                        group.subjectActionBlock should equal(parentsubjectActionBlock);
+                    });
+                });
+
+                context(@"which does not have a subject action block", ^{
+                    beforeEach(^{
+                        parent.subjectActionBlock should_not be_truthy;
+                    });
+
+                    it(@"should return nil", ^{
+                        group.subjectActionBlock should_not be_truthy;
+                    });
+                });
+            });
+
+            context(@"and with no parent", ^{
+                beforeEach(^{
+                    group.parent should be_nil;
+                });
+
+                it(@"should return nil", ^{
+                    group.subjectActionBlock should_not be_truthy;
+                });
             });
         });
     });

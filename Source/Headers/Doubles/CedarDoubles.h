@@ -7,4 +7,5 @@
 
 #import "Argument.h"
 #import "AnyArgument.h"
-#import "TypedArgument.h"
+#import "ValueArgument.h"
+#import "AnyInstanceArgument.h"

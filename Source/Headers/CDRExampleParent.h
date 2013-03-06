@@ -1,10 +1,13 @@
 #import <Foundation/Foundation.h>
 
+typedef void (^CDRSpecBlock)(void);
+
 @protocol CDRExampleParent
 
 - (BOOL)shouldRun;
 
 - (void)setUp;
+- (CDRSpecBlock)subjectActionBlock;
 - (void)runAction;
 - (void)tearDown;
 
@@ -13,4 +16,5 @@
 - (NSString *)fullText;
 - (NSMutableArray *)fullTextInPieces;
 
+- (NSUInteger)stackAddress;
 @end
