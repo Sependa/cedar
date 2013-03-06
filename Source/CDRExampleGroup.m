@@ -8,6 +8,7 @@
 @implementation CDRExampleGroup
 
 @synthesize examples = examples_, subjectActionBlock = subjectActionBlock_;
+@synthesize action = action_;
 
 
 + (id)groupWithText:(NSString *)text {
