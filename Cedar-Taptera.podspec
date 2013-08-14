@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name     = 'Cedar-Taptera'
-  s.version  = '0.0.5'
+  s.version  = '0.0.6'
   s.license  = 'MIT'
   s.summary  = 'BDD-style testing using Objective-C.'
   s.homepage = 'https://github.com/Taptera/cedar'
@@ -11,9 +11,9 @@ Pod::Spec.new do |s|
   files_pattern = 'Source/**/*.{h,m,mm}'
 
   s.ios.header_dir = 'Cedar-iOS'
-  s.ios.source_files = FileList[files_pattern].exclude(/CDROTestRunner.m$/)
+  s.ios.exclude_files = "/CDROTestRunner.m$/"
   
-  s.osx.source_files = FileList[files_pattern].exclude(/iPhone/)
+  s.osx.exclude_files = "/iPhone/"
   
   s.library = 'stdc++'
 end
