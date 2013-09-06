@@ -11,6 +11,7 @@ Pod::Spec.new do |s|
   s.osx.deployment_target = '10.7'
   s.ios.deployment_target = '5.0'
 
+  s.ios.header_dir = 'Cedar-iOS'
   s.source_files = 'Source/**/*.{h,m,mm}'
 
   s.ios.exclude_files = '**/CDROTestRunner.m'
