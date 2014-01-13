@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name     = 'Cedar-Taptera'
-  s.version  = '0.1.0'
+  s.version  = '0.2.0'
   s.license  = 'MIT'
   s.summary  = 'BDD-style testing using Objective-C.'
   s.homepage = 'https://github.com/Taptera/cedar'
