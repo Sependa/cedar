@@ -1,21 +1,24 @@
 #import "CDRExampleBase.h"
 #import "SpecHelper.h"
+#import "CDRReportDispatcher.h"
 
 @implementation CDRExampleBase
 
-@synthesize text = text_, parent = parent_, focused = focused_, stackAddress = stackAddress_;
+@synthesize text = text_, parent = parent_, focused = focused_, stackAddress = stackAddress_, startDate = startDate_,
+    endDate = endDate_;
 
 - (id)initWithText:(NSString *)text {
     if (self = [super init]) {
         text_ = [text retain];
         focused_ = NO;
-        runTime_ = 0;
     }
     return self;
 }
 
 - (void)dealloc {
     [text_ release];
+    [startDate_ release];
+    [endDate_ release];
     [super dealloc];
 }
 
@@ -25,7 +28,7 @@
 - (void)tearDown {
 }
 
-- (void)run {
+- (void)runWithDispatcher:(CDRReportDispatcher *)dispatcher {
 }
 
 - (BOOL)shouldRun {
@@ -41,6 +44,10 @@
     return NO;
 }
 
+- (CDRExampleState)state {
+    return CDRExampleStateIncomplete;
+}
+
 - (NSString *)message {
     return @"";
 }
@@ -50,7 +57,7 @@
 }
 
 - (NSMutableArray *)fullTextInPieces {
-    if (self.parent && [self.parent hasFullText]) {
+    if (self.parent && [self.parent respondsToSelector:@selector(hasFullText)] && [self.parent hasFullText]) {
         NSMutableArray *array = [self.parent fullTextInPieces];
         [array addObject:self.text];
         return array;
@@ -60,7 +67,7 @@
 }
 
 - (NSTimeInterval)runTime {
-    return runTime_;
+    return [endDate_ timeIntervalSinceDate:startDate_];
 }
 
 @end

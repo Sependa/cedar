@@ -10,17 +10,19 @@
 #import "CDRExample.h"
 #import "CDRExampleGroup.h"
 #import "CDRSpecFailure.h"
-#import "NoOpKeyValueObserver.h"
+#import "CDRExampleReporter.h"
+#import "SimpleKeyValueObserver.h"
 #import "FibonacciCalculator.h"
+#import "CDRReportDispatcher.h"
 
 using namespace Cedar::Matchers;
 using namespace Cedar::Doubles;
 
-void (^runInFocusedSpecsMode)(CDRExampleBase *) = ^(CDRExampleBase *example){
+void (^runInFocusedSpecsMode)(CDRExampleBase *, CDRReportDispatcher *) = ^(CDRExampleBase *example, CDRReportDispatcher *dispatcher){
     BOOL before = [SpecHelper specHelper].shouldOnlyRunFocused;
     [SpecHelper specHelper].shouldOnlyRunFocused = YES;
     @try {
-        [example run];
+        [example runWithDispatcher:dispatcher];
     } @finally {
         [SpecHelper specHelper].shouldOnlyRunFocused = before;
     }
@@ -133,14 +135,62 @@ CDRSharedExampleBlock sharedExampleMethod = [^(NSDictionary *context) {
 
 describe(@"CDRExample", ^{
     __block CDRExample *example;
+    __block CDRReportDispatcher *dispatcher;
     NSString *exampleText = @"Example!";
+    __block BOOL beforeFocused;
 
     beforeEach(^{
+        dispatcher = nice_fake_for([CDRReportDispatcher class]);
         example = [[CDRExample alloc] initWithText:exampleText andBlock:^{}];
+
+        // if you focus any of these specs, they will fail without this
+        beforeFocused = [SpecHelper specHelper].shouldOnlyRunFocused;
+        [SpecHelper specHelper].shouldOnlyRunFocused = NO;
+        // end
     });
 
     afterEach(^{
         [example release];
+        [SpecHelper specHelper].shouldOnlyRunFocused = beforeFocused;
+    });
+
+    describe(@"runWithDispatcher:", ^{
+        __block CDRReportDispatcher *dispatcher;
+        beforeEach(^{
+            dispatcher = nice_fake_for([CDRReportDispatcher class]);
+        });
+
+        beforeEach(^{
+            [example release];
+            example = [[CDRExample alloc] initWithText:exampleText andBlock:^{
+                // so we don't get a zero-value for runTime
+                [NSThread sleepForTimeInterval:0.01];
+            }];
+
+            // assert example is populated at the appropriate times
+            dispatcher stub_method(@selector(runWillStartExample:)).and_do(^(NSInvocation *invocation) {
+                example.state should equal(CDRExampleStateIncomplete);
+                example.runTime should equal(0);
+                example.startDate should_not be_nil;
+                example.endDate should be_nil;
+            });
+            dispatcher stub_method(@selector(runDidFinishExample:)).and_do(^(NSInvocation *invocation) {
+                example.state should equal(CDRExampleStatePassed);
+                example.runTime should_not equal(0);
+                example.endDate should_not be_nil;
+            });
+
+            [example runWithDispatcher:dispatcher];
+        });
+
+        it(@"should report the example", ^{
+            dispatcher should have_received(@selector(runWillStartExample:)).with(example);
+            dispatcher should have_received(@selector(runDidFinishExample:)).with(example);
+        });
+
+        it(@"should have its start date less than its end date", ^{
+            [example.endDate timeIntervalSinceDate:example.startDate] should be_greater_than(0);
+        });
     });
 
     describe(@"hasChildren", ^{
@@ -192,7 +242,7 @@ describe(@"CDRExample", ^{
 
         context(@"for an example that has run and succeeded", ^{
             beforeEach(^{
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should be CDRExampleStatePassed", ^{
@@ -205,7 +255,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should fail" andBlock:^{ fail(@"fail"); }];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should be CDRExampleStateFailed", ^{
@@ -218,7 +268,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should throw an NSException" andBlock:^{ [[NSException exceptionWithName:@"name" reason:@"reason" userInfo:nil] raise]; }];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should be CDRExampleStateError", ^{
@@ -231,7 +281,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should throw some nonsense" andBlock:^{ @throw @"Some nonsense"; }];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should be CDRExampleStateError", ^{
@@ -244,7 +294,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should be pending" andBlock:PENDING];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should be CDRExampleStatePending", ^{
@@ -260,7 +310,7 @@ describe(@"CDRExample", ^{
                 });
 
                 it(@"should be CDRExampleStatePassed", ^{
-                    runInFocusedSpecsMode(example);
+                    runInFocusedSpecsMode(example, dispatcher);
                     expect([example state]).to(equal(CDRExampleStatePassed));
                 });
             });
@@ -278,7 +328,7 @@ describe(@"CDRExample", ^{
                     });
 
                     it(@"should be CDRExampleStatePassed", ^{
-                        runInFocusedSpecsMode(example);
+                        runInFocusedSpecsMode(example, dispatcher);
                         expect([example state]).to(equal(CDRExampleStatePassed));
                     });
                 });
@@ -293,7 +343,7 @@ describe(@"CDRExample", ^{
                     });
 
                     it(@"should be CDRExampleStateSkipped", ^{
-                        runInFocusedSpecsMode(example);
+                        runInFocusedSpecsMode(example, dispatcher);
                         expect([example state]).to(equal(CDRExampleStateSkipped));
                     });
 
@@ -305,7 +355,7 @@ describe(@"CDRExample", ^{
                         });
 
                         it(@"should be CDRExampleStatePassed", ^{
-                            runInFocusedSpecsMode(example);
+                            runInFocusedSpecsMode(example, dispatcher);
                             expect([example state]).to(equal(CDRExampleStatePassed));
                         });
                     });
@@ -314,12 +364,16 @@ describe(@"CDRExample", ^{
         });
 
         describe(@"KVO", ^{
-            it(@"should report when the state changes", ^{
-                id mockObserver = [[[NoOpKeyValueObserver alloc] init] autorelease];
-                spy_on(mockObserver);
+            __block id mockObserver;
 
+            beforeEach(^{
+                mockObserver = [[[SimpleKeyValueObserver alloc] init] autorelease];
+                spy_on(mockObserver);
+            });
+
+            it(@"should report when the state of a non-collection property changes", ^{
                 [example addObserver:mockObserver forKeyPath:@"state" options:0 context:NULL];
-                [example run];
+                [example runWithDispatcher:dispatcher];
                 [example removeObserver:mockObserver forKeyPath:@"state"];
 
                 mockObserver should have_received("observeValueForKeyPath:ofObject:change:context:");
@@ -342,7 +396,7 @@ describe(@"CDRExample", ^{
 
         describe(@"when the state is passed", ^{
             beforeEach(^{
-                [example run];
+                [example runWithDispatcher:dispatcher];
                 CDRExampleState state = example.state;
                 expect(state).to(equal(CDRExampleStatePassed));
             });
@@ -382,7 +436,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should pass" andBlock:^{}];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should return an empty string", ^{
@@ -395,7 +449,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should pend" andBlock:nil];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should return an empty string", ^{
@@ -409,7 +463,7 @@ describe(@"CDRExample", ^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should pend" andBlock:nil];
                 example.focused = NO;
-                runInFocusedSpecsMode(example);
+                runInFocusedSpecsMode(example, dispatcher);
             });
 
             it(@"should return an empty string", ^{
@@ -424,7 +478,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should fail" andBlock:^{[[CDRSpecFailure specFailureWithReason:failureMessage] raise];}];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should return the failure message", ^{
@@ -441,7 +495,7 @@ describe(@"CDRExample", ^{
 
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should throw an exception" andBlock:^{ [exception raise]; }];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should return the description of the exception", ^{
@@ -455,7 +509,7 @@ describe(@"CDRExample", ^{
             beforeEach(^{
                 [example release];
                 example = [[CDRExample alloc] initWithText:@"I should throw an exception" andBlock:^{ @throw failureMessage; }];
-                [example run];
+                [example runWithDispatcher:dispatcher];
             });
 
             it(@"should return the description of whatever was thrown", ^{
@@ -484,8 +538,8 @@ describe(@"CDRExample", ^{
         it(@"should return the running time of the test", ^{
             fastExample.runTime should equal(0);
             slowExample.runTime should equal(0);
-            [fastExample run];
-            [slowExample run];
+            [fastExample runWithDispatcher:dispatcher];
+            [slowExample runWithDispatcher:dispatcher];
             fastExample.runTime should be_greater_than(0);
             slowExample.runTime should be_greater_than(0);
             slowExample.runTime should be_greater_than(fastExample.runTime);

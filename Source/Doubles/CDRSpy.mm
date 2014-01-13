@@ -1,23 +1,39 @@
+#import "NSInvocation+Cedar.h"
 #import "CDRSpy.h"
-#import "objc/runtime.h"
+#import <objc/runtime.h>
 #import "StubbedMethod.h"
 #import "CedarDoubleImpl.h"
+#import "CDRSpyInfo.h"
+
+@interface NSInvocation (UndocumentedPrivate)
+- (void)invokeUsingIMP:(IMP)imp;
+@end
 
 @implementation CDRSpy
 
 + (void)interceptMessagesForInstance:(id)instance {
+    if (!instance) {
+        @throw [NSException exceptionWithName:NSInternalInconsistencyException reason:@"Cannot spy on nil" userInfo:nil];
+    }
+    if (![object_getClass(instance) conformsToProtocol:@protocol(CedarDouble)]) {
+        [CDRSpyInfo storeSpyInfoForObject:instance];
+        object_setClass(instance, self);
+    }
+}
+
++ (void)stopInterceptingMessagesForInstance:(id)instance {
+    if (!instance) {
+        @throw [NSException exceptionWithName:NSInternalInconsistencyException reason:@"Cannot stop spying on nil" userInfo:nil];
+    }
     Class originalClass = [instance class];
-    objc_setAssociatedObject(instance, @"original-class", originalClass, OBJC_ASSOCIATION_ASSIGN);
-
-    CedarDoubleImpl *cedar_double_impl = [[[CedarDoubleImpl alloc] initWithDouble:instance] autorelease];
-    objc_setAssociatedObject(instance, @"cedar-double-implementation", cedar_double_impl, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-
-    object_setClass(instance, self);
+    if ([CDRSpyInfo clearSpyInfoForObject:instance]) {
+        object_setClass(instance, originalClass);
+    }
 }
 
 - (id)retain {
     __block id that = self;
-    [self as_original_class:^{
+    [self as_spied_class:^{
         [that retain];
     }];
     return self;
@@ -25,53 +41,85 @@
 
 - (oneway void)release {
     __block id that = self;
-    [self as_original_class:^{
+    [self as_spied_class:^{
         [that release];
     }];
 }
 
 - (id)autorelease {
     __block id that = self;
-    [self as_original_class:^{
+    [self as_spied_class:^{
         [that autorelease];
     }];
     return self;
 }
 
 - (NSUInteger)retainCount {
-   __block id that = self;
-   __block NSUInteger count;
-   [self as_original_class:^{
-       count = [that retainCount];
-   }];
-   return count;
+    __block id that = self;
+    __block NSUInteger count;
+    [self as_spied_class:^{
+        count = [that retainCount];
+    }];
+    return count;
 }
 
 - (NSString *)description {
+    __block id that = self;
     __block NSString *description;
-    [self as_original_class:^{
-        description = [self description];
+    [self as_spied_class:^{
+        description = [that description];
     }];
 
     return description;
 }
 
+- (Class)class {
+    return [CDRSpyInfo publicClassForObject:self];
+}
+
+- (BOOL)isKindOfClass:(Class)aClass {
+    Class originalClass = [CDRSpyInfo publicClassForObject:self];
+    return [originalClass isSubclassOfClass:aClass];
+}
+
 - (void)forwardInvocation:(NSInvocation *)invocation {
     [self.cedar_double_impl record_method_invocation:invocation];
+    int method_invocation_result = [self.cedar_double_impl invoke_stubbed_method:invocation];
 
-    if (![self.cedar_double_impl invoke_stubbed_method:invocation]) {
-/* This *almost* works, but makes KVC and some UIKit classes unhappy. */
-//        [self as_class:[self createTransientClassForSelector:invocation.selector] :^{
-        [self as_original_class:^{
-            [invocation invoke];
+    [invocation copyBlockArguments];
+    [invocation retainArguments];
+
+    if (method_invocation_result != CDRStubMethodInvoked) {
+        __block id forwardingTarget = nil;
+        __block id that = self;
+
+        SEL selector = invocation.selector;
+        [self as_spied_class:^{
+            forwardingTarget = [that forwardingTargetForSelector:selector];
         }];
+
+        if (forwardingTarget) {
+            [invocation invokeWithTarget:forwardingTarget];
+        } else {
+            CDRSpyInfo *spyInfo = [CDRSpyInfo spyInfoForObject:self];
+            IMP privateImp = [spyInfo impForSelector:selector];
+            if (privateImp) {
+                [invocation invokeUsingIMP:privateImp];
+            } else {
+                __block id that = self;
+                [self as_spied_class:^{
+                    [invocation invoke];
+                    [spyInfo setSpiedClass:object_getClass(that)];
+                }];
+            }
+        }
     }
 }
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)sel {
     __block NSMethodSignature *originalMethodSignature;
 
-    [self as_original_class:^{
+    [self as_spied_class:^{
         originalMethodSignature = [self methodSignatureForSelector:sel];
     }];
 
@@ -81,14 +129,24 @@
 - (BOOL)respondsToSelector:(SEL)selector {
     __block BOOL respondsToSelector;
 
-    [self as_original_class:^{
+    [self as_spied_class:^{
         respondsToSelector = [self respondsToSelector:selector];
     }];
 
     return respondsToSelector;
 }
 
-#pragma mark - CedarDouble protocol
+- (void)doesNotRecognizeSelector:(SEL)selector {
+    Class originalClass = [CDRSpyInfo publicClassForObject:self];
+    NSString *exceptionReason = [NSString stringWithFormat:@"-[%@ %@]: unrecognized selector sent to spy %p", NSStringFromClass(originalClass), NSStringFromSelector(selector), self];
+    @throw [NSException exceptionWithName:NSInvalidArgumentException reason:exceptionReason userInfo:nil];
+}
+
+#pragma mark - CedarDouble
+
+- (BOOL)can_stub:(SEL)selector {
+    return [self respondsToSelector:selector] && [self methodSignatureForSelector:selector];
+}
 
 - (Cedar::Doubles::StubbedMethod &)add_stub:(const Cedar::Doubles::StubbedMethod &)stubbed_method {
     return [self.cedar_double_impl add_stub:stubbed_method];
@@ -102,10 +160,10 @@
     [self.cedar_double_impl reset_sent_messages];
 }
 
-#pragma mark - Private interface
+#pragma mark - Private
 
 - (CedarDoubleImpl *)cedar_double_impl {
-    return objc_getAssociatedObject(self, @"cedar-double-implementation");
+    return [CDRSpyInfo cedarDoubleForObject:self];
 }
 
 - (void)as_class:(Class)klass :(void(^)())block {
@@ -121,39 +179,12 @@
     }
 }
 
-- (void)as_original_class:(void(^)())block {
-    [self as_class:objc_getAssociatedObject(self, @"original-class") :block];
-}
-
-- (Class)createTransientClassForSelector:(SEL)selector {
-    Class klass = objc_allocateClassPair([CDRSpy class], [self.uniqueClassName cStringUsingEncoding:NSUTF8StringEncoding], 0);
-    objc_registerClassPair(klass);
-
-    Class originalClass = objc_getAssociatedObject(self, @"original-class");
-    Method originalMethod = class_getInstanceMethod(originalClass, selector);
-
-    /*
-     Every now and then a method returns NULL for its implementation.  Since I have no
-     idea why, or how to get around this in a generic way, fall back to the original
-     class itself.  This will cause the spy to not record subsequent methods invoked
-     on self, but hopefully this is rare enough to not cause a problem.
-
-     The alternative is an EXC_BAD_ACCESS.
-     */
-    if (!originalMethod) {
-        return originalClass;
+- (void)as_spied_class:(void(^)())block {
+    CDRSpyInfo *info = [CDRSpyInfo spyInfoForObject:self];
+    Class originalClass = info.spiedClass;
+    if (originalClass != Nil) {
+        [self as_class:originalClass :block];
     }
-
-    class_addMethod(klass, selector, method_getImplementation(originalMethod), method_getTypeEncoding(originalMethod));
-    return klass;
-}
-
-- (NSString *)uniqueClassName {
-    CFUUIDRef uuid = CFUUIDCreate(kCFAllocatorDefault);
-    NSString *uuidStr = [(NSString *)CFUUIDCreateString(kCFAllocatorDefault, uuid) autorelease];
-    CFRelease(uuid);
-
-    return [NSString stringWithFormat:@"CDRSpyTransientClass-%@", uuidStr];
 }
 
 @end

@@ -241,6 +241,29 @@ describe(@"raise_exception matcher", ^{
                     });
                 });
             });
+
+            context(@"and the name is different", ^{
+                beforeEach(^{
+                    exception = [NSException exceptionWithName:NSInvalidArgumentException reason:reason userInfo:nil];
+                    block = [[^{
+                        [exception raise];
+                    } copy] autorelease];
+                });
+
+                describe(@"positive match", ^{
+                    it(@"should pass", ^{
+                        block should raise_exception.with_name(NSInvalidArgumentException).with_reason(reason);
+                    });
+                });
+
+                describe(@"negative match", ^{
+                    it(@"should fail with a sensible failure message", ^{
+                        expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to not raise an exception with name <%@> and reason <%@>", block, NSInvalidArgumentException, reason], ^{
+                            block should_not raise_exception.with_name(NSInvalidArgumentException).with_reason(reason);
+                        });
+                    });
+                });
+            });
         });
 
         context(@"when the block throws an exception with a different reason", ^{
@@ -268,6 +291,16 @@ describe(@"raise_exception matcher", ^{
             });
         });
 
+        context(@"when the block throws an exception which we compare to a string built at runtime", ^{
+            it(@"should not blow up when the autorelease pool drains", ^{
+                NSString *reason = [NSString stringWithFormat:@"Because we need to %@", @"test it."];
+                exception = [NSException exceptionWithName:NSInternalInconsistencyException reason:reason userInfo:nil];
+                ^{
+                    [exception raise];
+                } should raise_exception.with_name(NSInternalInconsistencyException).with_reason(reason);
+            });
+        });
+
         context(@"when the block does not throw an exception", ^{
             beforeEach(^{
                 block = [[^{} copy] autorelease];
@@ -284,6 +317,78 @@ describe(@"raise_exception matcher", ^{
             describe(@"negative match", ^{
                 it(@"should pass", ^{
                     block should_not raise_exception.with_reason(reason);
+                });
+            });
+        });
+    });
+
+    context(@"with a name specified", ^{
+        NSString *name = @"CDRSpecException";
+
+        context(@"when the block throws an exception with the specified name", ^{
+            beforeEach(^{
+                exception = [NSException exceptionWithName:name reason:nil userInfo:nil];
+                block = [[^{
+                    [exception raise];
+                } copy] autorelease];
+            });
+
+            describe(@"positive match", ^{
+                it(@"should pass", ^{
+                    block should raise_exception.with_name(name);
+                });
+            });
+
+            describe(@"negative match", ^{
+                it(@"should fail with a sensible failure message", ^{
+                    expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to not raise an exception with name <%@>", block, name], ^{
+                        block should_not raise_exception.with_name(name);
+                    });
+                });
+            });
+        });
+
+        context(@"when the block throws an exception with a different name", ^{
+            NSString *anotherName = @"CDRAnotherSpecException";
+
+            beforeEach(^{
+                exception = [NSException exceptionWithName:anotherName reason:nil userInfo:nil];
+                block = [[^{
+                    [exception raise];
+                } copy] autorelease];
+            });
+
+            describe(@"positive match", ^{
+                it(@"should fail with a sensible failure message", ^{
+                    expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to raise an exception with name <%@>", block, name], ^{
+                        block should raise_exception.with_name(name);
+                    });
+                });
+            });
+
+            describe(@"negative match", ^{
+                it(@"should pass", ^{
+                    block should_not raise_exception.with_name(name);
+                });
+            });
+        });
+
+        context(@"when the block does not throw an exception", ^{
+            beforeEach(^{
+                block = [[^{} copy] autorelease];
+            });
+
+            describe(@"positive match", ^{
+                it(@"should fail with a sensible failure message", ^{
+                    expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to raise an exception with name <%@>", block, name], ^{
+                        block should raise_exception.with_name(name);
+                    });
+                });
+            });
+
+            describe(@"negative match", ^{
+                it(@"should pass", ^{
+                    block should_not raise_exception.with_name(name);
                 });
             });
         });

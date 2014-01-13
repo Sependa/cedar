@@ -5,3 +5,5 @@ xcuserdata
 build
 .DS_Store
 .idea
+template-project
+DerivedData

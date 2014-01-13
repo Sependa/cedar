@@ -4,6 +4,9 @@
 #import <libunwind.h>
 #import <regex.h>
 
+const NSString *kCDRSymbolicatorErrorDomain = @"kCDRSymbolicatorErrorDomain";
+const NSString *kCDRSymbolicatorErrorMessageKey = @"kCDRSymbolicatorErrorMessage";
+
 NSUInteger CDRCallerStackAddress() {
 #if __arm__ // libunwind functions are not available
     return 0;
@@ -31,6 +34,7 @@ NSUInteger CDRCallerStackAddress() {
 @end
 
 @implementation CDRSymbolicator
+
 @synthesize
     addresses = addresses_,
     fileNames = fileNames_,
@@ -62,12 +66,22 @@ NSUInteger CDRCallerStackAddress() {
     return (index == NSNotFound) ? 0 : [[self.lineNumbers objectAtIndex:index] unsignedIntegerValue];
 }
 
-- (void)symbolicateAddresses:(NSArray *)addresses {
+- (void)symbolicateAddresses:(NSArray *)addresses error:(NSError **)error {
+#if __arm__
+    *error = self.buildNotAvailableError;
+    return;
+#else
     NSArray *validAddresses = [self.class validAddresses:addresses];
+    if (validAddresses.count == 0) {
+        *error = self.buildNoAddressesError;
+        return;
+    }
 
     CDRAtosTask *atosTask = [CDRAtosTask taskForCurrentTestExecutable];
     atosTask.addresses = validAddresses;
     [atosTask launch];
+
+    BOOL atLeastOneSuccessfulSymbolication = NO;
 
     for (int i=0; i<validAddresses.count; i++) {
         NSString *fileName = nil;
@@ -75,11 +89,42 @@ NSUInteger CDRCallerStackAddress() {
         [atosTask valuesOnLineNumber:i fileName:&fileName lineNumber:&lineNumber];
 
         if (fileName) {
+            atLeastOneSuccessfulSymbolication = YES;
             [self.addresses addObject:[validAddresses objectAtIndex:i]];
             [self.fileNames addObject:fileName];
             [self.lineNumbers addObject:lineNumber];
         }
     }
+
+    if (!atLeastOneSuccessfulSymbolication) {
+        *error = self.buildNotSuccessfulError;
+        return;
+    }
+#endif
+}
+
+- (NSError *)buildNoAddressesError {
+    NSString *message = @"Must provide at least one address.\n";
+    return [self buildErrorWithCode:kCDRSymbolicatorErrorNoAddresses message:message];
+}
+
+- (NSError *)buildNotAvailableError {
+    NSString *message = @"atos is not available to symbolicate.\n";
+    return [self buildErrorWithCode:kCDRSymbolicatorErrorNotAvailable message:message];
+}
+
+- (NSError *)buildNotSuccessfulError {
+    NSString *message =
+        @"atos was not able to symbolicate.\n"
+         "Try setting compiler Optimization Level to None (-O0).\n";
+    return [self buildErrorWithCode:kCDRSymbolicatorErrorNotSuccessful message:message];
+}
+
+- (NSError *)buildErrorWithCode:(NSUInteger)code message:(NSString *)message {
+    NSDictionary *details =
+        [NSDictionary dictionaryWithObjectsAndKeys:
+         message, kCDRSymbolicatorErrorMessageKey, nil];
+    return [NSError errorWithDomain:(id)kCDRSymbolicatorErrorDomain code:code userInfo:details];
 }
 
 + (NSArray *)validAddresses:(NSArray *)addresses {
@@ -103,6 +148,7 @@ NSUInteger CDRCallerStackAddress() {
 - (void)setEnvironment:(NSDictionary *)dict;
 
 - (void)setStandardOutput:(NSPipe *)pipe;
+- (void)setStandardError:(NSPipe *)pipe;
 - (void)launch;
 - (void)waitUntilExit;
 @end
@@ -132,6 +178,15 @@ NSUInteger CDRCallerStackAddress() {
 }
 
 - (void)launch {
+    // atos must have at least one address to symbolicate
+    // because it will otherwise wait for stdin.
+    if (self.addresses.count == 0) {
+        [[NSException
+            exceptionWithName:NSInvalidArgumentException
+            reason:@"Must provide at least one address"
+            userInfo:nil] raise];
+    }
+
     NSMutableArray *arguments = [NSMutableArray arrayWithObjects:@"-o", self.executablePath, nil];
 
     // Position-independent executables addresses need to be adjusted hence the slide argument
@@ -143,7 +198,7 @@ NSUInteger CDRCallerStackAddress() {
         [arguments addObject:[NSString stringWithFormat:@"%lx", (long)address.unsignedIntegerValue]];
     }
 
-    NSString *output = [self.class shellOutWithCommand:@"/usr/bin/atos" arguments:arguments];
+    NSString *output = [self.class shellOutWithCommand:@"/Applications/Xcode.app/Contents/Developer/usr/bin/atos" arguments:arguments];
     self.outputLines = [output componentsSeparatedByString:@"\n"];
 }
 
@@ -176,9 +231,6 @@ NSUInteger CDRCallerStackAddress() {
             encoding:NSUTF8StringEncoding] autorelease];
 
         *lineNumber = [NSNumber numberWithInteger:lineNumberStr.integerValue];
-    } else {
-        printf("atos was not able to symbolicate '%s'.\n", buf);
-        printf("Try setting compiler Optimization Level to None (-O0).\n");
     }
     free(matches);
 }
@@ -189,12 +241,24 @@ NSUInteger CDRCallerStackAddress() {
     [task setLaunchPath:command];
     [task setArguments:arguments];
 
-    NSPipe *pipe = [NSPipe pipe];
-    [task setStandardOutput:pipe];
-    [task launch];
+    NSPipe *standardOutput = [NSPipe pipe];
+    if (standardOutput) {
+        [task setStandardOutput:standardOutput];
+        [task setStandardError:standardOutput];
+    } else return nil;
+
+    @try {
+        [task launch];
+    } @catch (NSException *exception) {
+        // e.g. NSInvalidArgumentException reason: 'launch path is invalid'
+        if (exception.name == NSInvalidArgumentException) {
+            return nil;
+        } else @throw;
+    }
+
+    NSData *data = [[standardOutput fileHandleForReading] readDataToEndOfFile];
     [task waitUntilExit];
 
-    NSData *data = [[pipe fileHandleForReading] readDataToEndOfFile];
     NSString *string = [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
     [task release];
 
@@ -209,7 +273,7 @@ NSUInteger CDRCallerStackAddress() {
     long slide = _dyld_get_image_vmaddr_slide(0);
 
     // If running with SenTestingKit use test bundle executable
-    if (objc_getClass("SenTestProbe"))
+    if (objc_getClass("SenTestProbe") || objc_getClass("XCTestProbe"))
         [self getOtestBundleExecutablePath:&executablePath slide:&slide];
 
     return [[[self alloc] initWithExecutablePath:executablePath slide:slide addresses:nil] autorelease];
@@ -217,7 +281,7 @@ NSUInteger CDRCallerStackAddress() {
 
 + (void)getOtestBundleExecutablePath:(NSString **)executablePath slide:(long *)slide {
     for (int i=0; i<_dyld_image_count(); i++) {
-        if (strstr(_dyld_get_image_name(i), ".octest/") != NULL) {
+        if (strstr(_dyld_get_image_name(i), ".octest/") != NULL || strstr(_dyld_get_image_name(i), ".xctest/") != NULL) {
             *executablePath = [NSString stringWithUTF8String:_dyld_get_image_name(i)];
             *slide = _dyld_get_image_vmaddr_slide(i);
             return;

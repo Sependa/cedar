@@ -1,12 +1,15 @@
 PROJECT_NAME = "Cedar"
-APP_NAME = "OCUnitApp"
+APP_NAME = "Specs"
+APP_IOS_NAME = "OCUnitApp"
 CONFIGURATION = "Release"
 
 SPECS_TARGET_NAME = "Specs"
 UI_SPECS_TARGET_NAME = "iOSSpecs"
+IOS_FRAMEWORK_SPECS_TARGET_NAME = "iOSFrameworkSpecs"
 
 OCUNIT_LOGIC_SPECS_TARGET_NAME = "OCUnitAppLogicTests"
 OCUNIT_APPLICATION_SPECS_TARGET_NAME = "OCUnitAppTests"
+XCUNIT_APPLICATION_SPECS_TARGET_NAME = "OCUnitApp + XCTest"
 
 CEDAR_FRAMEWORK_TARGET_NAME = "Cedar"
 CEDAR_IOS_FRAMEWORK_TARGET_NAME = "Cedar-iOS"
@@ -14,16 +17,21 @@ SNIPPET_SENTINEL_VALUE = "isCedarSnippet"
 
 XCODE_TEMPLATES_DIR = "#{ENV['HOME']}/Library/Developer/Xcode/Templates"
 XCODE_SNIPPETS_DIR = "#{ENV['HOME']}/Library/Developer/Xcode/UserData/CodeSnippets"
+APPCODE_SNIPPETS_DIR = "#{ENV['HOME']}/Library/Preferences/appCode20/templates"
 
-SDK_VERSION = "6.1"
+SDK_VERSION = ENV["CEDAR_SDK_VERSION"] || "7.0"
+SDK_RUNTIME_VERSION = ENV["CEDAR_SDK_RUNTIME_VERSION"] || SDK_VERSION
+
 PROJECT_ROOT = File.dirname(__FILE__)
 BUILD_DIR = File.join(PROJECT_ROOT, "build")
 TEMPLATES_DIR = File.join(PROJECT_ROOT, "CodeSnippetsAndTemplates", "Templates")
 SNIPPETS_DIR = File.join(PROJECT_ROOT, "CodeSnippetsAndTemplates", "CodeSnippets")
+APPCODE_SNIPPETS_FILENAME = "Cedar.xml"
+APPCODE_SNIPPETS_FILE = File.join(PROJECT_ROOT, "CodeSnippetsAndTemplates", "AppCodeSnippets", APPCODE_SNIPPETS_FILENAME)
 DIST_STAGING_DIR = "#{BUILD_DIR}/dist"
 
-def sdk_dir
-  "#{xcode_developer_dir}/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator#{SDK_VERSION}.sdk"
+def sdk_dir(version)
+  "#{xcode_developer_dir}/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator#{version}.sdk"
 end
 
 # Xcode 4.3 stores its /Developer inside /Applications/Xcode.app, Xcode 4.2 stored it in /Developer
@@ -35,10 +43,21 @@ def build_dir(effective_platform_name)
   File.join(BUILD_DIR, CONFIGURATION + effective_platform_name)
 end
 
+def is_run_unit_tests_deprecated?
+  system("cat #{xcode_developer_dir}/Tools/RunUnitTests | grep -q 'RunUnitTests is obsolete.'")
+end
+
 def system_or_exit(cmd, stdout = nil)
   puts "Executing #{cmd}"
   cmd += " >#{stdout}" if stdout
-  system(cmd) or raise "******** Build failed ********"
+  system(cmd) or begin
+    output = `cat #{stdout}`
+    raise <<EOF
+******** Build failed ********
+#{output}
+
+EOF
+  end
 end
 
 def with_env_vars(env_vars)
@@ -65,7 +84,7 @@ def output_file(target)
 
   output_file = File.join(output_dir, "#{target}.output")
   puts "Output: #{output_file}"
-  output_file
+  "'#{output_file}'"
 end
 
 def kill_simulator
@@ -74,8 +93,8 @@ def kill_simulator
   system %Q[killall -m -KILL "iPhone Simulator"]
 end
 
-task :default => [:trim_whitespace, :specs, :focused_specs, :uispecs, "ocunit:logic", "ocunit:application"]
-task :cruise => [:clean, "ocunit:logic", "ocunit:application", :specs, :focused_specs, :uispecs]
+task :default => [:trim_whitespace, :specs, :focused_specs, :uispecs, :iosframeworkspecs, "ocunit:logic", "ocunit:application", :xcunit]
+task :cruise => [:clean, "ocunit:logic", "ocunit:application", :specs, :focused_specs, :uispecs, :iosframeworkspecs, :xcunit]
 
 desc "Trim whitespace"
 task :trim_whitespace do
@@ -84,25 +103,30 @@ end
 
 desc "Clean all targets"
 task :clean do
-  system_or_exit "rm -rf #{BUILD_DIR}/*", output_file("clean")
+  system_or_exit "rm -rf '#{BUILD_DIR}'/*", output_file("clean")
 end
 
 desc "Build specs"
 task :build_specs do
   puts "SYMROOT: #{ENV['SYMROOT']}"
-  system_or_exit(%Q[xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{SPECS_TARGET_NAME} -configuration #{CONFIGURATION} build SYMROOT=#{BUILD_DIR}], output_file("specs"))
+  system_or_exit(%Q[xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{SPECS_TARGET_NAME} -configuration #{CONFIGURATION} build SYMROOT='#{BUILD_DIR}'], output_file("specs"))
 end
 
 desc "Build UI specs"
 task :build_uispecs do
   kill_simulator
-  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{UI_SPECS_TARGET_NAME} -configuration #{CONFIGURATION} -sdk iphonesimulator build", output_file("uispecs")
+  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{UI_SPECS_TARGET_NAME} -configuration #{CONFIGURATION} -sdk iphonesimulator#{SDK_VERSION} build ARCHS=i386 SYMROOT='#{BUILD_DIR}'", output_file("uispecs")
 end
 
-desc "Build Cedar and Cedar-iOS frameworks"
-task :build_frameworks do
-  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{CEDAR_FRAMEWORK_TARGET_NAME} -configuration #{CONFIGURATION} build SYMROOT=#{BUILD_DIR}", output_file("build_cedar")
-  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{CEDAR_IOS_FRAMEWORK_TARGET_NAME} -configuration #{CONFIGURATION} build SYMROOT=#{BUILD_DIR}", output_file("build_cedar_ios")
+desc "Build iOS static framework specs"
+task :build_iosframeworkspecs do
+  kill_simulator
+  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{IOS_FRAMEWORK_SPECS_TARGET_NAME} -configuration #{CONFIGURATION} -sdk iphonesimulator#{SDK_VERSION} build ARCHS=i386 SYMROOT='#{BUILD_DIR}'", output_file("iosframeworkspecs")
+end
+
+desc "Build Cedar and Cedar-iOS frameworks, and verify built Cedar-iOS.framework"
+task :build_frameworks => :iosframeworkspecs do
+  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{CEDAR_FRAMEWORK_TARGET_NAME} -configuration #{CONFIGURATION} build SYMROOT='#{BUILD_DIR}'", output_file("build_cedar")
 end
 
 desc "Run specs"
@@ -119,7 +143,7 @@ task :focused_specs do
   # and should not be created in applications that want to use Cedar.
 
   focused_specs_target_name = "FocusedSpecs"
-  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{focused_specs_target_name} -configuration #{CONFIGURATION} build SYMROOT=#{BUILD_DIR}", output_file("focused_specs")
+  system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{focused_specs_target_name} -configuration #{CONFIGURATION} build SYMROOT='#{BUILD_DIR}'", output_file("focused_specs")
 
   build_dir = build_dir("")
   ENV["DYLD_FRAMEWORK_PATH"] = build_dir
@@ -131,16 +155,44 @@ require 'tmpdir'
 
 desc "Run UI specs"
 task :uispecs => :build_uispecs do
+  sdk_path = sdk_dir(SDK_RUNTIME_VERSION)
   env_vars = {
-    "DYLD_ROOT_PATH" => sdk_dir,
-    "IPHONE_SIMULATOR_ROOT" => sdk_dir,
+    "DYLD_ROOT_PATH" => sdk_path,
+    "IPHONE_SIMULATOR_ROOT" => sdk_path,
     "CFFIXED_USER_HOME" => Dir.tmpdir,
     "CEDAR_HEADLESS_SPECS" => "1",
     "CEDAR_REPORTER_CLASS" => "CDRColorizedReporter",
   }
 
   with_env_vars(env_vars) do
-    system_or_exit "#{File.join(build_dir("-iphonesimulator"), "#{UI_SPECS_TARGET_NAME}.app", UI_SPECS_TARGET_NAME)} -RegisterForSystemEvents";
+    system_or_exit "#{File.join(build_dir("-iphonesimulator"), "#{UI_SPECS_TARGET_NAME}.app", UI_SPECS_TARGET_NAME)} -RegisterForSystemEvents"
+  end
+end
+
+desc "Run iOS static framework specs"
+task :iosframeworkspecs => :build_iosframeworkspecs do
+  sdk_path = sdk_dir(SDK_RUNTIME_VERSION)
+  env_vars = {
+    "DYLD_ROOT_PATH" => sdk_path,
+    "IPHONE_SIMULATOR_ROOT" => sdk_path,
+    "CFFIXED_USER_HOME" => Dir.tmpdir,
+    "CEDAR_HEADLESS_SPECS" => "1",
+    "CEDAR_REPORTER_CLASS" => "CDRColorizedReporter",
+  }
+
+  with_env_vars(env_vars) do
+    system_or_exit "#{File.join(build_dir("-iphonesimulator"), "#{IOS_FRAMEWORK_SPECS_TARGET_NAME}.app", IOS_FRAMEWORK_SPECS_TARGET_NAME)} -RegisterForSystemEvents"
+  end
+end
+
+desc "Build and run XCUnit specs (#{XCUNIT_APPLICATION_SPECS_TARGET_NAME})"
+task :xcunit do
+  with_env_vars("CEDAR_REPORTER_CLASS" => "CDRColorizedReporter") do
+    if is_run_unit_tests_deprecated? and SDK_VERSION.split('.')[0].to_i >= 7
+      system_or_exit "xcodebuild test -project #{PROJECT_NAME}.xcodeproj -scheme #{XCUNIT_APPLICATION_SPECS_TARGET_NAME.inspect} -configuration #{CONFIGURATION} ARCHS=i386 SYMROOT='#{BUILD_DIR}' -destination 'OS=#{SDK_VERSION},name=iPhone Retina (3.5-inch)'"
+    else
+      puts "Running SDK #{SDK_VERSION}, which predates XCTest. Skipping."
+    end
   end
 end
 
@@ -151,7 +203,11 @@ namespace :ocunit do
   desc "Build and run OCUnit logic specs (#{OCUNIT_LOGIC_SPECS_TARGET_NAME})"
   task :logic do
     with_env_vars("CEDAR_REPORTER_CLASS" => "CDRColorizedReporter") do
-      system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{OCUNIT_LOGIC_SPECS_TARGET_NAME} -configuration #{CONFIGURATION} -arch x86_64 build TEST_AFTER_BUILD=YES SYMROOT=#{BUILD_DIR}"
+      if is_run_unit_tests_deprecated?
+        system_or_exit "xcodebuild test -project #{PROJECT_NAME}.xcodeproj -scheme #{APP_NAME} -configuration #{CONFIGURATION} SYMROOT='#{BUILD_DIR}' -destination 'arch=x86_64'"
+      else
+        system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{OCUNIT_LOGIC_SPECS_TARGET_NAME} -configuration #{CONFIGURATION} -arch x86_64 build TEST_AFTER_BUILD=YES SYMROOT='#{BUILD_DIR}'"
+      end
     end
   end
 
@@ -159,22 +215,27 @@ namespace :ocunit do
   task :application do
     kill_simulator
 
-    system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{OCUNIT_APPLICATION_SPECS_TARGET_NAME} -configuration #{CONFIGURATION} -sdk iphonesimulator#{SDK_VERSION} build TEST_AFTER_BUILD=NO SYMROOT=#{BUILD_DIR}", output_file("ocunit_application_specs")
+    if is_run_unit_tests_deprecated?
+      system_or_exit "xcodebuild test -project #{PROJECT_NAME}.xcodeproj -scheme #{APP_IOS_NAME} -configuration #{CONFIGURATION} ARCHS=i386 SYMROOT='#{BUILD_DIR}' -destination 'OS=#{SDK_VERSION},name=iPhone Retina (3.5-inch)'"
+    else
+      system_or_exit "xcodebuild -project #{PROJECT_NAME}.xcodeproj -target #{OCUNIT_APPLICATION_SPECS_TARGET_NAME} -configuration #{CONFIGURATION} -sdk iphonesimulator#{SDK_VERSION} build ARCHS=i386 TEST_AFTER_BUILD=NO SYMROOT='#{BUILD_DIR}'", output_file("ocunit_application_specs")
 
-    env_vars = {
-      "DYLD_ROOT_PATH" => sdk_dir,
-      "DYLD_INSERT_LIBRARIES" => "#{xcode_developer_dir}/Library/PrivateFrameworks/IDEBundleInjection.framework/IDEBundleInjection",
-      "DYLD_FALLBACK_LIBRARY_PATH" => sdk_dir,
-      "XCInjectBundle" => "#{File.join(build_dir("-iphonesimulator"), "#{OCUNIT_APPLICATION_SPECS_TARGET_NAME}.octest")}",
-      "XCInjectBundleInto" => "#{File.join(build_dir("-iphonesimulator"), "#{APP_NAME}.app/#{APP_NAME}")}",
-      "IPHONE_SIMULATOR_ROOT" => sdk_dir,
-      "CFFIXED_USER_HOME" => Dir.tmpdir,
-      "CEDAR_HEADLESS_SPECS" => "1",
-      "CEDAR_REPORTER_CLASS" => "CDRColorizedReporter",
-    }
+      sdk_path = sdk_dir(SDK_RUNTIME_VERSION)
+      env_vars = {
+        "DYLD_ROOT_PATH" => sdk_path,
+        "DYLD_INSERT_LIBRARIES" => "#{xcode_developer_dir}/Library/PrivateFrameworks/IDEBundleInjection.framework/IDEBundleInjection",
+        "DYLD_FALLBACK_LIBRARY_PATH" => sdk_path,
+        "XCInjectBundle" => "#{File.join(build_dir("-iphonesimulator"), "#{OCUNIT_APPLICATION_SPECS_TARGET_NAME}.octest")}",
+        "XCInjectBundleInto" => "#{File.join(build_dir("-iphonesimulator"), "#{APP_IOS_NAME}.app/#{APP_IOS_NAME}")}",
+        "IPHONE_SIMULATOR_ROOT" => sdk_path,
+          "CFFIXED_USER_HOME" => Dir.tmpdir,
+          "CEDAR_HEADLESS_SPECS" => "1",
+          "CEDAR_REPORTER_CLASS" => "CDRColorizedReporter",
+      }
 
-    with_env_vars(env_vars) do
-      system_or_exit "#{File.join(build_dir("-iphonesimulator"), "#{APP_NAME}.app/#{APP_NAME}")} -RegisterForSystemEvents -SenTest All";
+      with_env_vars(env_vars) do
+        system_or_exit "#{File.join(build_dir("-iphonesimulator"), "#{APP_IOS_NAME}.app/#{APP_IOS_NAME}")} -RegisterForSystemEvents -SenTest All"
+      end
     end
   end
 end
@@ -184,6 +245,7 @@ task :uninstall do
   puts "\nRemoving old templates...\n"
   system_or_exit "rm -rf \"#{XCODE_TEMPLATES_DIR}/File Templates/Cedar\""
   system_or_exit "rm -rf \"#{XCODE_TEMPLATES_DIR}/Project Templates/Cedar\""
+  system_or_exit "rm -f \"#{APPCODE_SNIPPETS_DIR}/#{APPCODE_SNIPPETS_FILENAME}\""
   system_or_exit "grep -Rl #{SNIPPET_SENTINEL_VALUE} #{XCODE_SNIPPETS_DIR} | xargs -I{} rm -f \"{}\""
 end
 
@@ -198,12 +260,14 @@ namespace :dist do
     system_or_exit %{rm -rf "#{DIST_STAGING_DIR}"/*}
     system_or_exit %{mkdir -p "#{DIST_STAGING_DIR}/Library/Developer/Xcode"}
     system_or_exit %{mkdir -p "#{DIST_STAGING_DIR}/Library/Developer/Xcode/UserData"}
+    system_or_exit %{mkdir -p "#{DIST_STAGING_DIR}/Library/Preferences/appCode20/templates"}
 
     system_or_exit %{cp "#{PROJECT_ROOT}/README.markdown" "#{DIST_STAGING_DIR}/README-Cedar.markdown"}
     system_or_exit %{cp "#{PROJECT_ROOT}/MIT.LICENSE" "#{DIST_STAGING_DIR}/LICENSE-Cedar.txt"}
 
     system_or_exit %{cp -R "#{TEMPLATES_DIR}" "#{DIST_STAGING_DIR}/Library/Developer/Xcode/"}
     system_or_exit %{cp -R "#{SNIPPETS_DIR}" "#{DIST_STAGING_DIR}/Library/Developer/Xcode/UserData/"}
+    system_or_exit %{cp "#{APPCODE_SNIPPETS_FILE}" "#{DIST_STAGING_DIR}/Library/Preferences/appCode20/templates/#{APPCODE_SNIPPETS_FILENAME}"}
 
 
     system_or_exit %{cp -R "#{BUILD_DIR}/#{CONFIGURATION}-iphoneuniversal/#{CEDAR_IOS_FRAMEWORK_TARGET_NAME}.framework" "#{cedar_project_templates_dir}/iOS Cedar Spec Suite.xctemplate/"}
@@ -223,6 +287,6 @@ end
 desc "Build frameworks and install templates and code snippets"
 task :install => [ :clean, :uninstall, "dist:prepare" ] do
   puts "\nInstalling templates...\n"
-  system_or_exit %{ditto "#{DIST_STAGING_DIR}/Library" ~/Library}
+  system_or_exit %{rsync -vcrlK "#{DIST_STAGING_DIR}/Library/" ~/Library}
 end
 

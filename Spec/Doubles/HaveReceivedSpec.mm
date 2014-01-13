@@ -31,6 +31,18 @@ describe(@"have_received matcher", ^{
         });
     });
 
+    context(@"with an object that is no longer being spied upon", ^{
+        beforeEach(^{
+            stop_spying_on(incrementer);
+        });
+
+        it(@"should raise a descriptive exception", ^{
+            expectExceptionWithReason([NSString stringWithFormat:@"Received expectation for non-double object <%@>", incrementer], ^{
+                incrementer should have_received("increment");
+            });
+        });
+    });
+
     context(@"for a method with no parameters", ^{
         SEL method = @selector(increment);
 
@@ -319,7 +331,7 @@ describe(@"have_received matcher", ^{
             });
 
             context(@"with the correct expected parameter", ^{
-                unsigned long long expectedFirstParameter = actualFirstParameter;
+                int expectedFirstParameter = actualFirstParameter;
                 NSObject * expectedSecondParameter = [NSNumber numberWithFloat:[actualSecondParameter floatValue]];
 
                 describe(@"positive match", ^{
@@ -331,11 +343,11 @@ describe(@"have_received matcher", ^{
 
                 describe(@"negative match", ^{
                     it(@"should fail with a sensible failure message", ^{
-                        expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to not have received message <%@>, with arguments: <%llu, %@>", incrementer, NSStringFromSelector(method), expectedFirstParameter, expectedSecondParameter], ^{
+                        expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to not have received message <%@>, with arguments: <%d, %@>", incrementer, NSStringFromSelector(method), expectedFirstParameter, expectedSecondParameter], ^{
                             expect(incrementer).to_not(have_received(method).with(expectedFirstParameter, expectedSecondParameter));
                         });
 
-                        expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to not have received message <%@>, with arguments: <%llu, %@>", incrementer, NSStringFromSelector(method), expectedFirstParameter, expectedSecondParameter], ^{
+                        expectFailureWithMessage([NSString stringWithFormat:@"Expected <%@> to not have received message <%@>, with arguments: <%d, %@>", incrementer, NSStringFromSelector(method), expectedFirstParameter, expectedSecondParameter], ^{
                             expect(incrementer).to_not(have_received("incrementByABit:andABitMore:").with(expectedFirstParameter, expectedSecondParameter));
                         });
                     });
@@ -390,7 +402,7 @@ describe(@"have_received matcher", ^{
     });
 
     context(@"for a method that the object does not respond to", ^{
-        SEL method = @selector(noSuchMethod:);
+        SEL method = NSSelectorFromString(@"noSuchMethod:");
 
         it(@"should raise an exception due to an invalid expectation", ^{
             NSString *methodString = NSStringFromSelector(method);

@@ -3,20 +3,23 @@
 namespace Cedar { namespace Matchers {
 
 #pragma mark - RaiseException
-    RaiseException::RaiseException(NSObject *expectedExceptionInstance /*= nil*/,
-                                          Class expectedExceptionClass /*= nil*/,
+    RaiseException::RaiseException(NSObject *expectedExceptionInstance /*= nil */,
+                                          Class expectedExceptionClass /*= nil */,
                                           bool allowSubclasses /*= false */,
-                                          NSString *reason /*= nil*/) :
+                                          NSString *reason /*= nil */,
+                                          NSString *name /* = nil */) :
     Base<RaiseExceptionMessageBuilder>(),
     expectedExceptionInstance_([expectedExceptionInstance retain]),
     expectedExceptionClass_(expectedExceptionClass),
     allowSubclasses_(allowSubclasses),
-    expectedReason_([reason retain]) {
+    expectedReason_([reason retain]),
+    expectedName_([name retain]) {
     }
 
     RaiseException::~RaiseException() {
         [expectedExceptionInstance_ release];
         [expectedReason_ release];
+        [expectedName_ release];
     }
 
     RaiseException RaiseException::operator()() const {
@@ -31,19 +34,27 @@ namespace Cedar { namespace Matchers {
         return RaiseException(expectedExceptionInstance);
     }
 
-
     RaiseException & RaiseException::or_subclass() {
         allowSubclasses_ = true;
         return *this;
     }
 
     RaiseException & RaiseException::with_reason(NSString * const reason) {
-        expectedReason_ = reason;
+        expectedReason_ = [reason retain];
         return *this;
     }
 
     RaiseException RaiseException::with_reason(NSString * const reason) const {
-        return RaiseException(nil, nil, false, reason);
+        return RaiseException(nil, nil, false, reason, nil);
+    }
+
+    RaiseException & RaiseException::with_name(NSString *const name) {
+        expectedName_ = [name retain];
+        return *this;
+    }
+
+    RaiseException RaiseException::with_name(NSString *const name) const {
+        return RaiseException(nil, nil, false, nil, name);
     }
 
 #pragma mark - Exception matcher
@@ -54,6 +65,7 @@ namespace Cedar { namespace Matchers {
         @catch (NSObject *exception) {
             return this->exception_matches_expected_class(exception) &&
             this->exception_matches_expected_instance(exception) &&
+            this->exception_matches_expected_name(exception) &&
             this->exception_matches_expected_reason(exception);
         }
         return false;
@@ -68,10 +80,15 @@ namespace Cedar { namespace Matchers {
             }
             [message appendFormat:@" <%@>", NSStringFromClass(expectedExceptionClass_)];
         }
-        if (expectedReason_) {
+        if (expectedName_) {
+            [message appendFormat:@" with name <%@>", expectedName_];
+            if (expectedReason_) {
+                [message appendFormat:@" and reason <%@>", expectedReason_];
+            }
+        }
+        else if (expectedReason_) {
             [message appendFormat:@" with reason <%@>", expectedReason_];
         }
-
         return message;
     }
 
@@ -86,6 +103,10 @@ namespace Cedar { namespace Matchers {
 
     bool RaiseException::exception_matches_expected_reason(NSObject * const exception) const {
         return !expectedReason_ || ([exception isKindOfClass:[NSException class]] && [expectedReason_ isEqualToString:[id(exception) reason]]);
+    }
+
+    bool RaiseException::exception_matches_expected_name(NSObject *const exception) const {
+        return !expectedName_ || ([exception isKindOfClass:[NSException class]] && [expectedName_ isEqualToString:[id(exception) name]]);
     }
 
     // Deprecated

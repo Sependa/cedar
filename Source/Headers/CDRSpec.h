@@ -55,6 +55,7 @@ void fail(NSString *);
 
 - (void)defineBehaviors;
 - (void)markAsFocusedClosestToLineNumber:(NSUInteger)lineNumber;
+- (NSArray *)allChildren;
 @end
 
 @interface CDRSpec (SpecDeclaration)
