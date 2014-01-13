@@ -10,7 +10,6 @@
 
 @synthesize examples = examples_;
 @synthesize subjectActionBlock = subjectActionBlock_;
-@synthesize examples = examples_, subjectActionBlock = subjectActionBlock_;
 @synthesize action = action_;
 
 

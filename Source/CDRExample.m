@@ -85,13 +85,8 @@ const CDRSpecBlock PENDING = nil;
                     self.state = CDRExampleStateError;
                 }
             }
-        } @finally{
-            [parent_ tearDown];
-            [pool drain];
         }
         [pool drain];
-    } else {
-        self.state = CDRExampleStatePending;
     }
     endDate_ = [[NSDate alloc] init];
 
