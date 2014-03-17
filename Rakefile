@@ -67,10 +67,12 @@ def with_env_vars(env_vars)
     ENV[key] = new_value
   end
 
-  yield
-
-  env_vars.each_key do |key|
-    ENV[key] = old_values[key]
+  begin
+    yield
+  ensure
+    env_vars.each_key do |key|
+      ENV[key] = old_values[key]
+    end
   end
 end
 
@@ -273,8 +275,8 @@ namespace :dist do
     system_or_exit %{cp -R "#{BUILD_DIR}/#{CONFIGURATION}-iphoneuniversal/#{CEDAR_IOS_FRAMEWORK_TARGET_NAME}.framework" "#{cedar_project_templates_dir}/iOS Cedar Spec Suite.xctemplate/"}
     system_or_exit %{cp -R "#{BUILD_DIR}/#{CONFIGURATION}-iphoneuniversal/#{CEDAR_IOS_FRAMEWORK_TARGET_NAME}.framework" "#{cedar_project_templates_dir}/iOS Cedar Testing Bundle.xctemplate/"}
 
-    system_or_exit %{cp -R "#{BUILD_DIR}/#{CONFIGURATION}/#{CEDAR_FRAMEWORK_TARGET_NAME}.framework" "#{cedar_project_templates_dir}/OSX Cedar Spec Suite.xctemplate/"}
-    system_or_exit %{cp -R "#{BUILD_DIR}/#{CONFIGURATION}/#{CEDAR_FRAMEWORK_TARGET_NAME}.framework" "#{cedar_project_templates_dir}/OSX Cedar Testing Bundle.xctemplate/"}
+    system_or_exit %{cp -R "#{BUILD_DIR}/#{CONFIGURATION}/#{CEDAR_FRAMEWORK_TARGET_NAME}.framework" "#{cedar_project_templates_dir}/OS X Cedar Spec Suite.xctemplate/#{CEDAR_FRAMEWORK_TARGET_NAME}.framework/"}
+    system_or_exit %{cp -R "#{BUILD_DIR}/#{CONFIGURATION}/#{CEDAR_FRAMEWORK_TARGET_NAME}.framework" "#{cedar_project_templates_dir}/OS X Cedar Testing Bundle.xctemplate/#{CEDAR_FRAMEWORK_TARGET_NAME}.framework/"}
   end
 
   task :package do
@@ -285,8 +287,27 @@ namespace :dist do
 end
 
 desc "Build frameworks and install templates and code snippets"
-task :install => [ :clean, :uninstall, "dist:prepare" ] do
+task :install => [:clean, :uninstall, "dist:prepare"] do
   puts "\nInstalling templates...\n"
   system_or_exit %{rsync -vcrlK "#{DIST_STAGING_DIR}/Library/" ~/Library}
 end
 
+desc "Build the frameworks and upgrade the target"
+task :upgrade, [:path_to_framework] => [:build_frameworks] do |task, args|
+  framework_folder = args.path_to_framework.split("/").last
+
+  case framework_folder
+    when "Cedar-iOS.framework"
+      cedar_name = "Cedar-iOS"
+      cedar_path = "#{CONFIGURATION}-iphoneuniversal"
+    when "Cedar.framework"
+      cedar_name = "Cedar"
+      cedar_path = "#{CONFIGURATION}"
+    else
+      raise "*** No framework found. ***"
+  end
+
+  puts "\nUpgrading #{cedar_name} framework...\n"
+
+  system_or_exit %{rsync -vkcr --delete "#{BUILD_DIR}/#{cedar_path}/#{cedar_name}.framework/" "#{args.path_to_framework}/"}
+end

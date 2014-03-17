@@ -132,9 +132,10 @@ NSArray *CDRSpecClassesToRun() {
 NSArray *CDRSpecsFromSpecClasses(NSArray *specClasses) {
     NSMutableArray *specs = [NSMutableArray arrayWithCapacity:specClasses.count];
     for (Class class in specClasses) {
-        CDRSpec *spec = [[[class alloc] init] autorelease];
+        CDRSpec *spec = [[class alloc] init];
         [spec defineBehaviors];
         [specs addObject:spec];
+        [spec release];
     }
     return specs;
 }
@@ -179,22 +180,24 @@ void CDRMarkXcodeFocusedExamplesInSpecs(NSArray *specs, NSArray *arguments) {
     }
 
     // TODO: should we handle the InvertScope + All case?
-    if ([@"All" isEqual:examplesArgument]) {
+    if ([@[@"Self", @"All"] containsObject:examplesArgument]) {
         return;
     }
 
     NSMutableDictionary *testMethodNamesBySpecClass = [NSMutableDictionary dictionary];
     for (NSString *testName in [examplesArgument componentsSeparatedByString:@","]) {
         NSArray *components = [testName componentsSeparatedByString:@"/"];
-        NSString *specClass = [components objectAtIndex:0];
-        NSString *testMethod = [components objectAtIndex:1];
+        if (components.count > 1) {
+            NSString *specClass = [components objectAtIndex:0];
+            NSString *testMethod = [components objectAtIndex:1];
 
-        NSMutableSet *testMethods = [testMethodNamesBySpecClass objectForKey:specClass];
-        if (!testMethods) {
-            testMethods = [NSMutableSet set];
-            [testMethodNamesBySpecClass setObject:testMethods forKey:specClass];
+            NSMutableSet *testMethods = [testMethodNamesBySpecClass objectForKey:specClass];
+            if (!testMethods) {
+                testMethods = [NSMutableSet set];
+                [testMethodNamesBySpecClass setObject:testMethods forKey:specClass];
+            }
+            [testMethods addObject:testMethod];
         }
-        [testMethods addObject:testMethod];
     }
 
     CDROTestNamer *testNamer = [[CDROTestNamer alloc] init];
@@ -239,7 +242,7 @@ NSArray *CDRPermuteSpecClassesWithSeed(NSArray *unsortedSpecClasses, unsigned in
         NSUInteger idx = rand() % permutedSpecClasses.count;
         [permutedSpecClasses exchangeObjectAtIndex:i withObjectAtIndex:idx];
     }
-    return permutedSpecClasses;
+    return [permutedSpecClasses autorelease];
 }
 
 unsigned int CDRGetRandomSeed() {
@@ -275,6 +278,8 @@ int runSpecsWithCustomExampleReporters(NSArray *reporters) {
 
         [dispatcher runDidComplete];
         int result = [dispatcher result];
+
+        [dispatcher release];
 
         __gcov_flush();
 

@@ -9,13 +9,15 @@ int runSpecsWithinUIApplication() {
 
     BOOL isTestBundle = objc_getClass("SenTestProbe") || objc_getClass("XCTestProbe");
 
-    char *defaultReporterClassName = isTestBundle ? "CDROTestReporter" : "CDRDefaultReporter";
-    NSArray *reporters = CDRReportersFromEnv(defaultReporterClassName);
+    char *defaultReporterClassName = isTestBundle ? "CDROTestReporter,CDRBufferedDefaultReporter" : "CDRDefaultReporter";
+    @autoreleasepool {
+        NSArray *reporters = CDRReportersFromEnv(defaultReporterClassName);
 
-    if (![reporters count]) {
-        exitStatus = -999;
-    } else {
-        exitStatus = runSpecsWithCustomExampleReporters(reporters);
+        if (![reporters count]) {
+            exitStatus = -999;
+        } else {
+            exitStatus = runSpecsWithCustomExampleReporters(reporters);
+        }
     }
 
     return exitStatus;
